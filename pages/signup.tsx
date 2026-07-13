@@ -30,10 +30,10 @@ export default function SignupPage() {
       if (role === "artist") {
         router.replace("/create-profile");
       } else {
-        router.replace("/artists");
+        router.replace("/client-onboarding");
       }
-    } catch (err: any) {
-      setError(err?.message ?? "Authentication failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
       setLoading(false);
     }
@@ -47,10 +47,10 @@ export default function SignupPage() {
       if (role === "artist") {
         router.replace("/create-profile");
       } else {
-        router.replace("/artists");
+        router.replace("/client-onboarding");
       }
-    } catch (err: any) {
-      setError(err?.message ?? "Google sign-in failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Google sign-in failed");
     } finally {
       setLoading(false);
     }
