@@ -1,36 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import { firebase } from "@/lib/firebaseClient";
-import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-
-type ArtistProfile = {
-  fullName: string;
-  profilePictureUrl: string;
-  coverBannerUrl: string;
-  artForm: string;
-  artSubForms: string[];
-  bio: string;
-  state: string;
-  city: string;
-  country: string;
-  area: string;
-  youtubeVideos: string[];
-  youtubeVideo?: string;
-  youtubeVideoCaptions?: string[];
-  performanceImageUrls: string[];
-  performanceImageCaptions?: string[];
-  phone: string;
-  email: string;
-  instagram: string;
-  facebook: string;
-  youtube: string;
-  experience: string;
-  languages: string[];
-  eventTypes: string[];
-  priceRange: string;
-};
+import { supabase, mapArtistRow, type ArtistProfile } from "@/lib/supabaseClient";
 
 function getYouTubeId(url: string): string | null {
   if (!url) return null;
@@ -207,11 +178,11 @@ export default function PublicArtistPage() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(firebase.auth, (u) => {
-      setIsLoggedIn(!!u);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session?.user);
       setAuthChecked(true);
     });
-    return () => unsub();
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -219,13 +190,18 @@ export default function PublicArtistPage() {
     const id = router.query.id as string;
     if (!id) { router.replace("/artists"); return; }
 
-    getDoc(doc(firebase.db, "artists", id))
-      .then((snap) => {
-        if (snap.exists()) setProfile(snap.data() as ArtistProfile);
+    (async () => {
+      try {
+        const { data: d, error: dbError } = await supabase.from("artists").select("*").eq("id", id).maybeSingle();
+        if (dbError) throw dbError;
+        if (d) setProfile(mapArtistRow(d));
         else setError("Artist not found.");
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"))
-      .finally(() => setLoading(false));
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to load");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [router.isReady, router.query.id, router]);
 
   if (loading || !authChecked) {
@@ -249,9 +225,7 @@ export default function PublicArtistPage() {
     );
   }
 
-  const videos = profile.youtubeVideos?.filter(Boolean).length
-    ? profile.youtubeVideos.filter(Boolean)
-    : profile.youtubeVideo ? [profile.youtubeVideo] : [];
+  const videos = profile.youtubeVideos?.filter(Boolean) ?? [];
   const images = profile.performanceImageUrls ?? [];
   const locationLine = [profile.area, profile.city, profile.state, profile.country].filter(Boolean).join(", ");
   const hasContact = !!(profile.phone || profile.email);
@@ -271,7 +245,7 @@ export default function PublicArtistPage() {
         <img src="/logo_2.png" alt="ArtInYou" className="h-8 w-auto object-contain brightness-0 invert absolute left-1/2 -translate-x-1/2" />
         {isLoggedIn ? (
           <button
-            onClick={() => firebase.auth.signOut()}
+            onClick={() => supabase.auth.signOut()}
             className="text-xs font-semibold text-white/70 hover:text-white transition-colors"
           >
             Sign out

@@ -1,9 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
-import { firebase } from "@/lib/firebaseClient";
-import { doc, serverTimestamp, setDoc, getDoc } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { supabase, ARTIST_MEDIA_BUCKET } from "@/lib/supabaseClient";
 
 // ─── Data ───────────────────────────────────────────────────────────────────
 
@@ -144,39 +141,39 @@ export default function CreateProfilePage() {
   });
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(firebase.auth, async (u) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const u = session?.user;
       if (!u) { router.replace({ pathname: "/signup", query: { role: "artist" } }); return; }
-      setUserId(u.uid);
+      setUserId(u.id);
       setForm((p) => ({ ...p, email: u.email ?? p.email }));
       try {
-        const snap = await getDoc(doc(firebase.db, "artists", u.uid));
-        if (snap.exists()) {
-          const d = snap.data();
+        const { data: d } = await supabase.from("artists").select("*").eq("id", u.id).maybeSingle();
+        if (d) {
           setForm((p) => ({
             ...p,
-            fullName: d.fullName ?? "", profilePictureUrl: d.profilePictureUrl ?? "",
-            coverBannerUrl: d.coverBannerUrl ?? "", artForm: d.artForm ?? "",
-            artSubForms: d.artSubForms ?? [], bio: d.bio ?? "",
+            fullName: d.full_name ?? "", profilePictureUrl: d.profile_picture_url ?? "",
+            coverBannerUrl: d.cover_banner_url ?? "", artForm: d.art_form ?? "",
+            artSubForms: d.art_sub_forms ?? [], bio: d.bio ?? "",
             state: d.state ?? "", city: d.city ?? "", area: d.area ?? "",
             country: d.country ?? "India",
-            youtubeVideos: d.youtubeVideos?.length ? d.youtubeVideos : d.youtubeVideo ? [d.youtubeVideo] : [""],
+            youtubeVideos: d.youtube_videos?.length ? d.youtube_videos : [""],
             youtubeVideoCaptions: (() => {
-              const vids: string[] = d.youtubeVideos?.length ? d.youtubeVideos : d.youtubeVideo ? [d.youtubeVideo] : [""];
-              const caps: string[] = d.youtubeVideoCaptions ?? [];
+              const vids: string[] = d.youtube_videos?.length ? d.youtube_videos : [""];
+              const caps: string[] = d.youtube_video_captions ?? [];
               return vids.map((_: string, i: number) => caps[i] ?? "");
             })(),
             phone: d.phone ?? "", email: d.email ?? p.email,
             instagram: d.instagram ?? "", facebook: d.facebook ?? "", youtube: d.youtube ?? "",
             experience: d.experience ?? "", languages: d.languages ?? [],
-            eventTypes: d.eventTypes ?? [], priceRange: d.priceRange ?? "",
-            performanceImageUrls: d.performanceImageUrls ?? [],
-            performanceImageCaptions: d.performanceImageCaptions ?? [],
+            eventTypes: d.event_types ?? [], priceRange: d.price_range ?? "",
+            performanceImageUrls: d.performance_image_urls ?? [],
+            performanceImageCaptions: d.performance_image_captions ?? [],
           }));
           setProfileSaved(true);
         }
       } catch {}
     });
-    return () => unsub();
+    return () => subscription.unsubscribe();
   }, [router]);
 
   function update<K extends keyof ArtistProfile>(key: K, value: ArtistProfile[K]) {
@@ -184,8 +181,10 @@ export default function CreateProfilePage() {
   }
 
   async function uploadFile(file: File, path: string): Promise<string> {
-    const snap = await uploadBytes(ref(firebase.storage, path), file);
-    return getDownloadURL(snap.ref);
+    const { error } = await supabase.storage.from(ARTIST_MEDIA_BUCKET).upload(path, file, { upsert: true });
+    if (error) throw error;
+    const { data } = supabase.storage.from(ARTIST_MEDIA_BUCKET).getPublicUrl(path);
+    return data.publicUrl;
   }
 
   function handlePerfImagesAdd(e: React.ChangeEvent<HTMLInputElement>) {
@@ -218,11 +217,11 @@ export default function CreateProfilePage() {
     try {
       let profilePictureUrl = form.profilePictureUrl;
       let coverBannerUrl = form.coverBannerUrl;
-      if (form.profilePicture) profilePictureUrl = await uploadFile(form.profilePicture, `artists/${userId}/profile_${Date.now()}.${form.profilePicture.name.split(".").pop()}`);
-      if (form.coverBanner) coverBannerUrl = await uploadFile(form.coverBanner, `artists/${userId}/banner_${Date.now()}.${form.coverBanner.name.split(".").pop()}`);
+      if (form.profilePicture) profilePictureUrl = await uploadFile(form.profilePicture, `${userId}/profile_${Date.now()}.${form.profilePicture.name.split(".").pop()}`);
+      if (form.coverBanner) coverBannerUrl = await uploadFile(form.coverBanner, `${userId}/banner_${Date.now()}.${form.coverBanner.name.split(".").pop()}`);
 
       const newImageUrls = await Promise.all(
-        newPerformanceFiles.map((f, i) => uploadFile(f, `artists/${userId}/perf_${Date.now()}_${i}.${f.name.split(".").pop()}`))
+        newPerformanceFiles.map((f, i) => uploadFile(f, `${userId}/perf_${Date.now()}_${i}.${f.name.split(".").pop()}`))
       );
       const allPerformanceUrls = [...form.performanceImageUrls, ...newImageUrls];
       const allPerformanceCaptions = [...form.performanceImageCaptions, ...newPerformanceCaptions];
@@ -234,23 +233,21 @@ export default function CreateProfilePage() {
         .filter((x) => x.keep)
         .map((x) => x.cap);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data: Record<string, any> = {
-        fullName: form.fullName, profilePictureUrl, coverBannerUrl,
-        artForm: form.artForm, artSubForms: form.artSubForms, bio: form.bio,
+      const { error: dbError } = await supabase.from("artists").upsert({
+        id: userId,
+        full_name: form.fullName, profile_picture_url: profilePictureUrl, cover_banner_url: coverBannerUrl,
+        art_form: form.artForm, art_sub_forms: form.artSubForms, bio: form.bio,
         state: form.state, city: form.city, area: form.area, country: form.country,
-        youtubeVideos: filteredVideos,
-        youtubeVideoCaptions: filteredVideoCaptions,
+        youtube_videos: filteredVideos,
+        youtube_video_captions: filteredVideoCaptions,
         phone: form.phone, email: form.email,
         instagram: form.instagram, facebook: form.facebook, youtube: form.youtube,
         experience: form.experience, languages: form.languages,
-        eventTypes: form.eventTypes, priceRange: form.priceRange,
-        performanceImageUrls: allPerformanceUrls,
-        performanceImageCaptions: allPerformanceCaptions,
-        updatedAt: serverTimestamp(),
-      };
-      if (!profileSaved) data.createdAt = serverTimestamp();
-      await setDoc(doc(firebase.db, "artists", userId), data);
+        event_types: form.eventTypes, price_range: form.priceRange,
+        performance_image_urls: allPerformanceUrls,
+        performance_image_captions: allPerformanceCaptions,
+      });
+      if (dbError) throw dbError;
 
       update("performanceImageUrls", allPerformanceUrls);
       update("performanceImageCaptions", allPerformanceCaptions);

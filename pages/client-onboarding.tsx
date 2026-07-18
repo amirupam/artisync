@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import { firebase } from "@/lib/firebaseClient";
-import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { supabase } from "@/lib/supabaseClient";
 
 const INDIA_STATES: Record<string, string[]> = {
   "Andhra Pradesh": ["Vijayawada","Visakhapatnam","Guntur","Nellore","Tirupati","Kurnool","Rajahmundry","Kakinada","Eluru","Ongole"],
@@ -43,25 +41,28 @@ const INDIA_STATES: Record<string, string[]> = {
 
 export default function ClientOnboardingPage() {
   const router = useRouter();
+  const [userId, setUserId] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ fullName: "", phone: "", state: "", city: "" });
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(firebase.auth, async (u) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const u = session?.user;
       if (!u) {
         router.replace({ pathname: "/signup", query: { role: "client" } });
         return;
       }
-      const snap = await getDoc(doc(firebase.db, "clients", u.uid));
-      if (snap.exists()) {
+      setUserId(u.id);
+      const { data } = await supabase.from("clients").select("id").eq("id", u.id).maybeSingle();
+      if (data) {
         router.replace("/artists");
         return;
       }
       setChecking(false);
     });
-    return () => unsub();
+    return () => subscription.unsubscribe();
   }, [router]);
 
   function set(field: string, value: string) {
@@ -72,18 +73,20 @@ export default function ClientOnboardingPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.fullName.trim()) { setError("Please enter your name"); return; }
+    if (!userId) return;
     setSaving(true);
     setError(null);
     try {
-      const u = firebase.auth.currentUser!;
-      await setDoc(doc(firebase.db, "clients", u.uid), {
-        fullName: form.fullName.trim(),
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error: dbError } = await supabase.from("clients").insert({
+        id: userId,
+        full_name: form.fullName.trim(),
         phone: form.phone.trim(),
         state: form.state,
         city: form.city,
-        email: u.email ?? "",
-        createdAt: serverTimestamp(),
+        email: user?.email ?? "",
       });
+      if (dbError) throw dbError;
       const returnTo = typeof router.query.returnTo === "string" ? router.query.returnTo : "/artists";
       router.replace(returnTo);
     } catch (err: unknown) {

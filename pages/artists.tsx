@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import { firebase } from "@/lib/firebaseClient";
-import { collection, getDocs } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+import { supabase, mapArtistRow } from "@/lib/supabaseClient";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -165,14 +163,13 @@ export default function ArtistsPage() {
   const [filterMaxPrice, setFilterMaxPrice] = useState("");
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(firebase.auth, (u) => setIsLoggedIn(!!u));
-    return () => unsub();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setIsLoggedIn(!!session?.user));
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    getDocs(collection(firebase.db, "artists")).then((snap) => {
-      const entries: ArtistEntry[] = [];
-      snap.forEach((d) => entries.push({ id: d.id, data: d.data() as ArtistDoc }));
+    supabase.from("artists").select("*").then(({ data }) => {
+      const entries: ArtistEntry[] = (data ?? []).map((row) => ({ id: row.id, data: mapArtistRow(row) }));
       setArtists(entries);
       setLoadingArtists(false);
     });
@@ -226,7 +223,7 @@ export default function ArtistsPage() {
           </div>
           {isLoggedIn ? (
             <button
-              onClick={() => firebase.auth.signOut().then(() => router.replace("/"))}
+              onClick={() => supabase.auth.signOut().then(() => router.replace("/"))}
               className="flex-shrink-0 text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors"
             >
               Sign out

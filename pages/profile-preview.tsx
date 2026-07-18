@@ -1,35 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { firebase } from "@/lib/firebaseClient";
-import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-
-type ArtistProfile = {
-  fullName: string;
-  profilePictureUrl: string;
-  coverBannerUrl: string;
-  artForm: string;
-  artSubForms: string[];
-  bio: string;
-  state: string;
-  city: string;
-  country: string;
-  area: string;
-  youtubeVideos: string[];
-  youtubeVideo?: string;
-  youtubeVideoCaptions?: string[];
-  performanceImageUrls: string[];
-  performanceImageCaptions?: string[];
-  phone: string;
-  email: string;
-  instagram: string;
-  facebook: string;
-  youtube: string;
-  experience: string;
-  languages: string[];
-  eventTypes: string[];
-  priceRange: string;
-};
+import { supabase, mapArtistRow, type ArtistProfile } from "@/lib/supabaseClient";
 
 function getYouTubeId(url: string): string | null {
   if (!url) return null;
@@ -206,17 +177,18 @@ export default function ProfilePreviewPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(firebase.auth, async (u) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const u = session?.user;
       if (!u) { router.replace({ pathname: "/signup", query: { role: "artist" } }); return; }
       try {
-        const snap = await getDoc(doc(firebase.db, "artists", u.uid));
-        if (snap.exists()) setProfile(snap.data() as ArtistProfile);
-        else setError("No profile found.");
+        const { data: d, error: dbError } = await supabase.from("artists").select("*").eq("id", u.id).maybeSingle();
+        if (dbError) throw dbError;
+        if (d) setProfile(mapArtistRow(d)); else setError("No profile found.");
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Failed to load");
       } finally { setLoading(false); }
     });
-    return () => unsub();
+    return () => subscription.unsubscribe();
   }, [router]);
 
   if (loading) return (
@@ -237,9 +209,7 @@ export default function ProfilePreviewPage() {
     </div>
   );
 
-  const videos = profile.youtubeVideos?.filter(Boolean).length
-    ? profile.youtubeVideos.filter(Boolean)
-    : profile.youtubeVideo ? [profile.youtubeVideo] : [];
+  const videos = profile.youtubeVideos?.filter(Boolean) ?? [];
   const images = profile.performanceImageUrls ?? [];
   const locationLine = [profile.area, profile.city, profile.state, profile.country].filter(Boolean).join(", ");
 

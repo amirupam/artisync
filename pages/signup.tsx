@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import { firebase } from "@/lib/firebaseClient";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -22,11 +21,11 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
     try {
-      if (mode === "signup") {
-        await createUserWithEmailAndPassword(firebase.auth, email, password);
-      } else {
-        await signInWithEmailAndPassword(firebase.auth, email, password);
-      }
+      const { error: authError } =
+        mode === "signup"
+          ? await supabase.auth.signUp({ email, password })
+          : await supabase.auth.signInWithPassword({ email, password });
+      if (authError) throw authError;
       if (role === "artist") {
         router.replace("/create-profile");
       } else {
@@ -43,15 +42,15 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
     try {
-      await signInWithPopup(firebase.auth, firebase.googleProvider);
-      if (role === "artist") {
-        router.replace("/create-profile");
-      } else {
-        router.replace("/client-onboarding");
-      }
+      const redirectPath = role === "artist" ? "/create-profile" : "/client-onboarding";
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}${redirectPath}` },
+      });
+      if (authError) throw authError;
+      // On success, Supabase redirects the browser to Google and back — no further code runs here.
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Google sign-in failed");
-    } finally {
       setLoading(false);
     }
   }
