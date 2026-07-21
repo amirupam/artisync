@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { stripOAuthHashIfPresent } from "@/lib/stripOAuthHash";
 import { resolveEntryPath } from "@/lib/roleRouting";
+import Container from "@/components/Container";
+import Logo from "@/components/Logo";
+import Button from "@/components/Button";
+import Input from "@/components/Input";
+import Select from "@/components/Select";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const INDIA_STATES: Record<string, string[]> = {
   "Andhra Pradesh": ["Vijayawada","Visakhapatnam","Guntur","Nellore","Tirupati","Kurnool","Rajahmundry","Kakinada","Eluru","Ongole"],
@@ -109,8 +114,8 @@ export default function ClientOnboardingPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-[var(--color-page)] flex items-center justify-center">
+        <LoadingSpinner size="lg" label="Loading" />
       </div>
     );
   }
@@ -118,96 +123,44 @@ export default function ClientOnboardingPage() {
   const cities = form.state ? (INDIA_STATES[form.state] ?? []) : [];
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <video autoPlay loop muted playsInline className="absolute inset-0 h-full w-full object-cover">
-        <source src="/background-video.mp4" type="video/mp4" />
-      </video>
-      <div className="absolute inset-0 bg-black/50" />
-
-      <header className="relative z-10 p-4">
-        <Link href="/">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo_2.png" alt="ArtInYou" className="h-24 w-24 object-contain" />
-        </Link>
+    <div className="min-h-screen bg-[var(--color-page)] flex flex-col">
+      <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+        <Container className="flex h-16 items-center">
+          <Logo size="md" />
+        </Container>
       </header>
 
-      <div className="relative z-10 flex justify-center px-6 pb-10">
-        <div className="w-full max-w-md">
-          <div className="rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 p-8 shadow-2xl">
-            <div className="mb-6 text-center">
-              <h1 className="text-2xl font-black text-white">Almost there!</h1>
-              <p className="text-sm text-white/60 mt-1">Tell us a bit about yourself so artists can reach you</p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-white/60 uppercase tracking-widest mb-1.5">Your name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Full name"
-                  value={form.fullName}
-                  onChange={(e) => set("fullName", e.target.value)}
-                  className="w-full rounded-xl border-0 bg-white/20 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/50 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-white/60 uppercase tracking-widest mb-1.5">Phone number</label>
-                <input
-                  type="tel"
-                  placeholder="+91 XXXXX XXXXX"
-                  value={form.phone}
-                  onChange={(e) => set("phone", e.target.value)}
-                  className="w-full rounded-xl border-0 bg-white/20 px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/50 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-white/60 uppercase tracking-widest mb-1.5">State</label>
-                <select
-                  value={form.state}
-                  onChange={(e) => set("state", e.target.value)}
-                  className="w-full rounded-xl border-0 bg-white/20 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/50 text-sm"
-                >
-                  <option value="" className="bg-gray-900">Select state</option>
-                  {Object.keys(INDIA_STATES).sort().map((s) => (
-                    <option key={s} value={s} className="bg-gray-900">{s}</option>
-                  ))}
-                </select>
-              </div>
-
-              {cities.length > 0 && (
-                <div>
-                  <label className="block text-xs font-semibold text-white/60 uppercase tracking-widest mb-1.5">City</label>
-                  <select
-                    value={form.city}
-                    onChange={(e) => set("city", e.target.value)}
-                    className="w-full rounded-xl border-0 bg-white/20 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/50 text-sm"
-                  >
-                    <option value="" className="bg-gray-900">Select city</option>
-                    {cities.map((c) => (
-                      <option key={c} value={c} className="bg-gray-900">{c}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {error && (
-                <div className="rounded-lg bg-red-500/20 border border-red-500/30 p-3">
-                  <p className="text-sm text-red-200">{error}</p>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full rounded-xl bg-amber-400 px-4 py-3 font-black text-gray-900 hover:bg-amber-300 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 text-sm"
-              >
-                {saving ? "Saving..." : "Continue →"}
-              </button>
-            </form>
+      <div className="flex-1 flex items-center justify-center px-4 py-14">
+        <div className="w-full max-w-[440px] rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-8 shadow-[var(--shadow-sm)]">
+          <div className="mb-6">
+            <h1 className="text-2xl">Almost there!</h1>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Tell us a bit about yourself so artists can reach you.</p>
           </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            <Input label="Your name" required value={form.fullName} onChange={(e) => set("fullName", e.target.value)} />
+            <Input label="Phone number" optional type="tel" placeholder="+91 XXXXX XXXXX" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+
+            <Select label="State" optional value={form.state} onChange={(e) => set("state", e.target.value)}>
+              <option value="">Select state</option>
+              {Object.keys(INDIA_STATES).sort().map((s) => <option key={s} value={s}>{s}</option>)}
+            </Select>
+
+            {cities.length > 0 && (
+              <Select label="City" optional value={form.city} onChange={(e) => set("city", e.target.value)}>
+                <option value="">Select city</option>
+                {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+              </Select>
+            )}
+
+            {error && (
+              <p className="rounded-[var(--radius-md)] bg-[var(--color-error-soft)] px-4 py-3 text-sm text-[var(--color-error)]" role="alert">{error}</p>
+            )}
+
+            <Button type="submit" variant="primary" size="lg" fullWidth disabled={saving}>
+              {saving ? "Saving…" : "Continue"}
+            </Button>
+          </form>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase, mapArtistRow, type ArtistProfile } from "@/lib/supabaseClient";
+import Logo from "@/components/Logo";
 
 function getYouTubeId(url: string): string | null {
   if (!url) return null;
@@ -229,8 +230,7 @@ export default function ProfilePreviewPage() {
 
       {/* ── Navbar ── */}
       <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between px-5 h-14 bg-black/50 backdrop-blur-xl">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo_2.png" alt="ArtInYou" className="h-8 w-auto object-contain brightness-0 invert" />
+        <Logo size="sm" variant="light" />
         <button
           onClick={() => router.push("/create-profile")}
           className="text-xs font-semibold px-4 py-2 bg-amber-400 text-gray-900 rounded-lg hover:bg-amber-300 transition-all"
