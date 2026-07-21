@@ -1,6 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { supabase, ARTIST_MEDIA_BUCKET } from "@/lib/supabaseClient";
+import { getArtistProfileCompleteness } from "@/lib/artistProfileCompleteness";
+import { stripOAuthHashIfPresent } from "@/lib/stripOAuthHash";
+import ArtistOnboardingCard from "@/components/ArtistOnboardingCard";
+import LoadingSpinner from "@/components/LoadingSpinner";
+
+const ONBOARDING_DISMISS_KEY = "artisync_artist_onboarding_dismissed";
 
 // ─── Data ───────────────────────────────────────────────────────────────────
 
@@ -120,6 +126,8 @@ export default function CreateProfilePage() {
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [checkingProfile, setCheckingProfile] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -146,7 +154,7 @@ export default function CreateProfilePage() {
     async function handleUser(u: { id: string; email?: string | null } | null | undefined) {
       if (cancelled) return;
       if (!u) { router.replace({ pathname: "/signup", query: { role: "artist" } }); return; }
-      if (window.location.href.includes("#")) window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      stripOAuthHashIfPresent();
       setUserId(u.id);
       setForm((p) => ({ ...p, email: u.email ?? p.email }));
       try {
@@ -174,8 +182,12 @@ export default function CreateProfilePage() {
             performanceImageCaptions: d.performance_image_captions ?? [],
           }));
           setProfileSaved(true);
+        } else if (sessionStorage.getItem(ONBOARDING_DISMISS_KEY) !== "1") {
+          setShowOnboarding(true);
         }
-      } catch {}
+      } catch {} finally {
+        if (!cancelled) setCheckingProfile(false);
+      }
     }
 
     // getSession() reliably awaits the client's session restore; onAuthStateChange's
@@ -190,8 +202,35 @@ export default function CreateProfilePage() {
     return () => { cancelled = true; subscription.unsubscribe(); };
   }, [router]);
 
+  // Deep-link support: /create-profile#section-portfolio (used by the dashboard's
+  // shortcut buttons) scrolls to that section once the form has rendered.
+  useEffect(() => {
+    if (checkingProfile) return;
+    const hash = window.location.hash.slice(1);
+    if (hash.startsWith("section-")) {
+      const target = document.getElementById(hash);
+      if (target) setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    }
+  }, [checkingProfile]);
+
   function update<K extends keyof ArtistProfile>(key: K, value: ArtistProfile[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function handleCompleteProfile() {
+    setShowOnboarding(false);
+    const { nextIncompleteSection } = getArtistProfileCompleteness(form);
+    if (nextIncompleteSection) {
+      // Wait for the modal to unmount before scrolling to the target section.
+      setTimeout(() => {
+        document.getElementById(nextIncompleteSection)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
+    }
+  }
+
+  function handleOnboardingLater() {
+    sessionStorage.setItem(ONBOARDING_DISMISS_KEY, "1");
+    setShowOnboarding(false);
   }
 
   async function uploadFile(file: File, path: string): Promise<string> {
@@ -279,8 +318,22 @@ export default function CreateProfilePage() {
   const allPerformancePreviews = [...form.performanceImageUrls, ...performancePreviews];
   const totalImages = allPerformancePreviews.length;
 
+  if (checkingProfile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f8f6]">
+        <LoadingSpinner size="lg" label="Loading your profile" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f8f8f6]">
+      <ArtistOnboardingCard
+        open={showOnboarding}
+        onComplete={handleCompleteProfile}
+        onLater={handleOnboardingLater}
+      />
+
       {/* Navbar */}
       <nav className="fixed top-0 inset-x-0 bg-white/90 backdrop-blur-md border-b border-gray-100 z-50 h-14">
         <div className="h-full px-5 flex items-center justify-between">
@@ -314,7 +367,7 @@ export default function CreateProfilePage() {
         </div>
 
         {/* ── Profile picture ── */}
-        <div className="relative px-6 lg:px-10">
+        <div id="section-photo" className="relative px-6 lg:px-10">
           <div className="absolute -top-14 left-6 lg:left-10">
             <div className="w-28 h-28 rounded-2xl border-4 border-white bg-gray-100 overflow-hidden shadow-xl">
               {(form.profilePicture || form.profilePictureUrl) ? (
@@ -343,12 +396,14 @@ export default function CreateProfilePage() {
         <div className="mt-20 px-6 lg:px-10 pb-24 space-y-12 max-w-4xl">
 
           {/* Name */}
-          <input type="text" required placeholder="Your full name"
-            value={form.fullName} onChange={(e) => update("fullName", e.target.value)}
-            className="w-full text-3xl sm:text-4xl font-bold text-gray-900 bg-transparent border-none outline-none placeholder-gray-300" />
+          <div id="section-name">
+            <input type="text" required placeholder="Your full name"
+              value={form.fullName} onChange={(e) => update("fullName", e.target.value)}
+              className="w-full text-3xl sm:text-4xl font-bold text-gray-900 bg-transparent border-none outline-none placeholder-gray-300" />
+          </div>
 
           {/* ── Art Form ── */}
-          <section>
+          <section id="section-art-form">
             <SectionLabel>Art Form</SectionLabel>
             <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
               {Object.keys(ART_FORMS).map((af) => (
@@ -370,7 +425,7 @@ export default function CreateProfilePage() {
           </section>
 
           {/* ── Bio ── */}
-          <section>
+          <section id="section-bio">
             <SectionLabel>About You</SectionLabel>
             <textarea placeholder="Describe your style, experience and what makes you unique as an artist…"
               value={form.bio} onChange={(e) => update("bio", e.target.value)} rows={4}
@@ -378,7 +433,7 @@ export default function CreateProfilePage() {
           </section>
 
           {/* ── Performance Photos ── */}
-          <section>
+          <section id="section-portfolio">
             <div className="flex items-center justify-between mb-4">
               <SectionLabel className="mb-0">Performance Photos</SectionLabel>
               <span className="text-xs text-gray-400">{totalImages}/12</span>
@@ -554,7 +609,7 @@ export default function CreateProfilePage() {
           </section>
 
           {/* ── Location ── */}
-          <section>
+          <section id="section-location">
             <SectionLabel>Location</SectionLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* State */}
@@ -593,7 +648,7 @@ export default function CreateProfilePage() {
           </section>
 
           {/* ── Contact & Social ── */}
-          <section>
+          <section id="section-contact">
             <SectionLabel>Contact & Social</SectionLabel>
             <div className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

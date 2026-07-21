@@ -2,35 +2,78 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { resolveEntryPath, type EntryRole } from "@/lib/roleRouting";
+import Logo from "@/components/Logo";
+import Container from "@/components/Container";
+import Button from "@/components/Button";
+import Input from "@/components/Input";
+import PasswordInput from "@/components/PasswordInput";
+import Modal from "@/components/Modal";
+import Badge from "@/components/Badge";
+
+const MIN_PASSWORD_LENGTH = 6;
+
+const ROLE_COPY: Record<EntryRole, { heading: string; supporting: string }> = {
+  artist: {
+    heading: "Create your artist account",
+    supporting: "Build your profile, showcase your work, and connect with potential clients.",
+  },
+  client: {
+    heading: "Create your client account",
+    supporting: "Find and connect with artists who match your event or project.",
+  },
+};
 
 export default function SignupPage() {
   const router = useRouter();
-  const role = useMemo(() => (typeof router.query.role === "string" ? router.query.role : "artist"), [router.query.role]);
+  const role: EntryRole = useMemo(() => (router.query.role === "client" ? "client" : "artist"), [router.query.role]);
   const [mode, setMode] = useState<"signin" | "signup">("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ password?: string; confirmPassword?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotStatus, setForgotStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [forgotError, setForgotError] = useState<string | null>(null);
+
   useEffect(() => {
     setError(null);
+    setFieldErrors({});
   }, [mode]);
+
+  function validate(): boolean {
+    const next: typeof fieldErrors = {};
+    if (mode === "signup") {
+      if (password.length < MIN_PASSWORD_LENGTH) {
+        next.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+      }
+      if (confirmPassword !== password) {
+        next.confirmPassword = "Passwords do not match.";
+      }
+    }
+    setFieldErrors(next);
+    return Object.keys(next).length === 0;
+  }
 
   async function handleEmailAuth(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+    if (!validate()) return;
+    setLoading(true);
     try {
-      const { error: authError } =
+      const { data, error: authError } =
         mode === "signup"
           ? await supabase.auth.signUp({ email, password })
           : await supabase.auth.signInWithPassword({ email, password });
       if (authError) throw authError;
-      if (role === "artist") {
-        router.replace("/create-profile");
-      } else {
-        router.replace("/client-onboarding");
-      }
+
+      const userId = data.user?.id;
+      const destination = userId ? await resolveEntryPath(userId, role) : role === "client" ? "/client-onboarding" : "/create-profile";
+      router.replace(destination);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
@@ -42,181 +85,243 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
     try {
-      const redirectPath = role === "artist" ? "/create-profile" : "/client-onboarding";
+      // /auth/callback resolves the role-aware destination once the user lands
+      // back on this domain, since an OAuth redirect can't run our own JS mid-flight.
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}${redirectPath}` },
+        options: { redirectTo: `${window.location.origin}/auth/callback?role=${role}` },
       });
       if (authError) throw authError;
-      // On success, Supabase redirects the browser to Google and back — no further code runs here.
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Google sign-in failed");
       setLoading(false);
     }
   }
 
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setForgotStatus("sending");
+    setForgotError(null);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (resetError) throw resetError;
+      setForgotStatus("sent");
+    } catch (err: unknown) {
+      setForgotError(err instanceof Error ? err.message : "Could not send reset email");
+      setForgotStatus("error");
+    }
+  }
+
+  const heading = mode === "signin" ? "Welcome back" : ROLE_COPY[role].heading;
+  const supporting = mode === "signin" ? "Sign in to continue to your account." : ROLE_COPY[role].supporting;
+
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      {/* Video Background */}
-      <video
-        autoPlay
-        loop
-        muted={true}
-        playsInline
-        className="absolute inset-0 h-full w-full object-cover"
-      >
-        <source src="/background-video.mp4" type="video/mp4" />
-        {/* Fallback for browsers that don't support video */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900" />
-      </video>
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* ── Left: brand panel (desktop only) ── */}
+      <div className="hidden lg:flex lg:w-[42%] xl:w-1/2 relative flex-col justify-between bg-[var(--color-primary)] text-white p-12 xl:p-16 overflow-hidden">
+        <div aria-hidden="true" className="pointer-events-none absolute -top-24 -left-16 h-80 w-80 rounded-full bg-[var(--color-accent)]/20 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute bottom-0 right-0 h-96 w-96 rounded-full bg-[var(--color-secondary)]/20 blur-3xl" />
 
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-black/40" />
+        <Logo href={null} variant="light" size="lg" />
 
-      {/* Header with Logo */}
-      <header className="relative z-10 p-4">
-        <div className="flex items-center">
-          <img
-            src="/logo_2.png"
-            alt="Artisync Logo"
-            className="h-16 w-auto object-contain"
-          />
+        <div className="relative">
+          <h1 className="text-white text-4xl xl:text-5xl">Where artists and opportunities meet.</h1>
+          <p className="mt-4 max-w-md text-[var(--color-text-on-dark-soft)]">
+            Discover talent. Create together.
+          </p>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <div className="relative z-10 flex min-h-screen items-start justify-center px-6 pt-1">
-        <div className="w-full max-w-md">
-          {/* Auth Card */}
-          <div className="rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 p-8 shadow-2xl">
-            {/* Role Indicator */}
-            <div className="mb-6 text-center">
-              <div className="inline-flex items-center space-x-2 rounded-full bg-white/20 px-4 py-2 text-sm text-white">
-                <span>Role:</span>
-                <span className="font-medium">{role}</span>
-                <Link 
-                  href={{ pathname: "/signup", query: { role: role === "artist" ? "client" : "artist" } }}
-                  className="ml-2 text-white/80 hover:text-white underline text-xs"
-                >
-                  Switch
-                </Link>
-              </div>
+        <p className="relative text-xs text-[var(--color-text-on-dark-soft)]">
+          © {new Date().getFullYear()} ArtiSync. All rights reserved.
+        </p>
+      </div>
+
+      {/* ── Right: form panel ── */}
+      <div className="flex-1 flex flex-col bg-[var(--color-page)]">
+        <header className="lg:hidden border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+          <Container className="flex h-16 items-center">
+            <Logo size="md" />
+          </Container>
+        </header>
+
+        <div className="flex-1 flex items-center justify-center px-4 py-10 sm:py-14">
+          <div className="w-full max-w-[460px]">
+            <div className="mb-6 flex items-center justify-center gap-2">
+              <Badge variant="neutral" className="normal-case tracking-normal">
+                Role: {role === "artist" ? "Artist" : "Client"}
+              </Badge>
+              <Link
+                href={{ pathname: "/signup", query: { role: role === "artist" ? "client" : "artist" } }}
+                className="text-xs font-semibold text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] underline underline-offset-2
+                  focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] rounded-sm"
+              >
+                Change role
+              </Link>
             </div>
 
-            {/* Mode Tabs */}
-            <div className="mb-6 grid grid-cols-2 gap-1 rounded-xl bg-white/10 p-1">
+            <div className="mb-7 grid grid-cols-2 gap-1 rounded-[var(--radius-md)] bg-[var(--color-primary-soft)] p-1">
               <button
+                type="button"
                 onClick={() => setMode("signin")}
-                className={`rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
-                  mode === "signin" 
-                    ? "bg-white text-gray-900 shadow-lg" 
-                    : "text-white/80 hover:text-white"
-                }`}
+                className={`rounded-[calc(var(--radius-md)-4px)] px-4 py-2.5 text-sm font-semibold transition-all min-h-[40px]
+                  focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]
+                  ${mode === "signin" ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-[var(--shadow-sm)]" : "text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"}`}
               >
-                Sign in
+                Sign In
               </button>
               <button
+                type="button"
                 onClick={() => setMode("signup")}
-                className={`rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
-                  mode === "signup" 
-                    ? "bg-white text-gray-900 shadow-lg" 
-                    : "text-white/80 hover:text-white"
-                }`}
+                className={`rounded-[calc(var(--radius-md)-4px)] px-4 py-2.5 text-sm font-semibold transition-all min-h-[40px]
+                  focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]
+                  ${mode === "signup" ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-[var(--shadow-sm)]" : "text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"}`}
               >
-                Create account
+                Create Account
               </button>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleEmailAuth} className="space-y-4">
-              <div>
-                <input
-                  type="email"
+            <h2 className="text-2xl">{heading}</h2>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{supporting}</p>
+
+            <form onSubmit={handleEmailAuth} className="mt-6 space-y-4" noValidate>
+              <Input
+                label="Email address"
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+
+              <PasswordInput
+                label="Password"
+                required
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                error={fieldErrors.password}
+                hint={mode === "signup" ? `At least ${MIN_PASSWORD_LENGTH} characters.` : undefined}
+              />
+
+              {mode === "signup" && (
+                <PasswordInput
+                  label="Confirm password"
                   required
-                  placeholder="Email address"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-xl border-0 bg-white/20 px-4 py-3 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  error={fieldErrors.confirmPassword}
                 />
-              </div>
-              <div>
-                <input
-                  type="password"
-                  required
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl border-0 bg-white/20 px-4 py-3 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
-              </div>
-              
-              {error && (
-                <div className="rounded-lg bg-red-500/20 border border-red-500/30 p-3">
-                  <p className="text-sm text-red-200">{error}</p>
+              )}
+
+              {mode === "signin" && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setForgotEmail(email); setForgotStatus("idle"); setForgotError(null); setForgotOpen(true); }}
+                    className="text-xs font-semibold text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]
+                      focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] rounded-sm"
+                  >
+                    Forgot password?
+                  </button>
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-xl bg-white px-4 py-3 font-semibold text-gray-900 hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
-              >
-                {loading ? "Please wait..." : mode === "signup" ? "Create account" : "Sign in"}
-              </button>
+              {error && (
+                <p className="rounded-[var(--radius-md)] bg-[var(--color-error-soft)] px-4 py-3 text-sm text-[var(--color-error)]" role="alert">
+                  {error}
+                </p>
+              )}
+
+              <Button type="submit" variant="primary" size="lg" fullWidth disabled={loading}>
+                {loading ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
+              </Button>
             </form>
 
-            {/* Divider */}
-            <div className="my-6 flex items-center">
-              <div className="flex-1 border-t border-white/20" />
-              <span className="px-4 text-sm text-white/60">or</span>
-              <div className="flex-1 border-t border-white/20" />
+            <div className="my-6 flex items-center gap-4">
+              <div className="flex-1 border-t border-[var(--color-border)]" />
+              <span className="text-xs font-medium text-[var(--color-text-secondary)]">OR</span>
+              <div className="flex-1 border-t border-[var(--color-border)]" />
             </div>
 
-            {/* Google Button */}
-            <button
-              onClick={handleGoogle}
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              fullWidth
               disabled={loading}
-              className="w-full rounded-xl border border-white/30 bg-white/10 px-4 py-3 text-white hover:bg-white/20 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center space-x-3"
+              onClick={handleGoogle}
+              className="gap-3"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-5 w-5">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-5 w-5 flex-shrink-0">
                 <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12 s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C33.046,6.053,28.715,4,24,4C12.955,4,4,12.955,4,24 s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
                 <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,16.108,18.961,13,24,4C15.316,4,7.846,9.337,6.306,14.691z"/>
                 <path fill="#4CAF50" d="M24,44c4.686,0,8.961-1.802,12.191-4.864l-5.624-4.73C28.542,36.262,26.392,37,24,37c-5.203,0-9.621-3.343-11.283-8.011 l-6.558,5.046C7.67,39.556,15.138,44,24,44z"/>
                 <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12 c0-1.258,0.217-2.466,0.612-3.592l6.558-5.046C5.239,13.854,4,18.779,4,24c0,11.045,8.955,20,20,20s20-8.955,20-20 C44,22.659,43.862,21.35,43.611,20.083z"/>
               </svg>
-              <span>Continue with Google</span>
-            </button>
+              Continue with Google
+            </Button>
 
-            {/* Footer */}
+            <p className="mt-6 text-center text-xs text-[var(--color-text-secondary)]">
+              By continuing, you agree to our Terms and Privacy Policy.
+            </p>
+
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
+                className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)]
+                  focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] rounded-sm"
+              >
+                {mode === "signup" ? "Already have an account? " : "New to ArtiSync? "}
+                <span className="text-[var(--color-accent)] font-semibold">{mode === "signup" ? "Sign in" : "Create one"}</span>
+              </button>
+            </div>
+
             <div className="mt-6 text-center">
-              <p className="text-xs text-white/60">
-                By continuing, you agree to our Terms and Privacy Policy
-              </p>
-              <Link href="/" className="mt-3 inline-block text-sm text-white/80 hover:text-white underline">
-                Back to home
+              <Link
+                href="/"
+                className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)]
+                  focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] rounded-sm"
+              >
+                ← Back to home
               </Link>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Mute Button */}
-      <button
-        onClick={() => {
-          const video = document.querySelector('video');
-          if (video) {
-            video.muted = !video.muted;
-          }
-        }}
-        className="fixed bottom-6 left-6 z-20 rounded-full bg-white/20 backdrop-blur-sm p-3 text-white hover:bg-white/30 transition-all duration-200"
-        title="Toggle sound"
-      >
-        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M6.343 6.343a1 1 0 011.414 0l8.486 8.486a1 1 0 01-1.414 1.414L6.343 7.757a1 1 0 010-1.414z" />
-        </svg>
-      </button>
+      <Modal open={forgotOpen} onClose={() => setForgotOpen(false)} title="Reset your password">
+        {forgotStatus === "sent" ? (
+          <p className="text-sm text-[var(--color-text)]">
+            If an account exists for <strong>{forgotEmail}</strong>, we&rsquo;ve sent a password reset link to it.
+          </p>
+        ) : (
+          <form onSubmit={handleForgotPassword} className="space-y-4">
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              Enter your email address and we&rsquo;ll send you a link to reset your password.
+            </p>
+            <Input
+              label="Email address"
+              type="email"
+              required
+              autoComplete="email"
+              value={forgotEmail}
+              onChange={(e) => setForgotEmail(e.target.value)}
+            />
+            {forgotError && (
+              <p className="rounded-[var(--radius-md)] bg-[var(--color-error-soft)] px-4 py-3 text-sm text-[var(--color-error)]" role="alert">
+                {forgotError}
+              </p>
+            )}
+            <Button type="submit" variant="primary" size="md" fullWidth disabled={forgotStatus === "sending"}>
+              {forgotStatus === "sending" ? "Sending…" : "Send reset link"}
+            </Button>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 }
-
-
