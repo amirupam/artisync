@@ -168,7 +168,7 @@ export default function ArtistsPage() {
   }, []);
 
   useEffect(() => {
-    supabase.from("artists").select("*").then(({ data }) => {
+    supabase.from("artists").select("*").eq("status", "published").then(({ data }) => {
       const entries: ArtistEntry[] = (data ?? []).map((row) => ({ id: row.id, data: mapArtistRow(row) }));
       setArtists(entries);
       setLoadingArtists(false);

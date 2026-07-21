@@ -4,10 +4,11 @@ export type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   label?: string;
   hint?: string;
   error?: string;
+  optional?: boolean;
 };
 
 const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
-  { label, hint, error, className = "", id, rows = 4, ...rest },
+  { label, hint, error, optional, className = "", id, rows = 4, ...rest },
   ref
 ) {
   const autoId = useId();
@@ -17,7 +18,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textare
     <div className="w-full">
       {label && (
         <label htmlFor={textareaId} className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-          {label}
+          {label} {optional && <span className="text-[var(--color-text-secondary)] font-normal">(optional)</span>}
         </label>
       )}
       <textarea

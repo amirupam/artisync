@@ -4,10 +4,11 @@ export type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
   label?: string;
   hint?: string;
   error?: string;
+  optional?: boolean;
 };
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  { label, hint, error, className = "", id, children, ...rest },
+  { label, hint, error, optional, className = "", id, children, ...rest },
   ref
 ) {
   const autoId = useId();
@@ -17,7 +18,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
     <div className="w-full">
       {label && (
         <label htmlFor={selectId} className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-          {label}
+          {label} {optional && <span className="text-[var(--color-text-secondary)] font-normal">(optional)</span>}
         </label>
       )}
       <div className="relative">

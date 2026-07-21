@@ -31,21 +31,30 @@ export const ARTIST_MEDIA_BUCKET = "artist-media";
 
 export type ArtistProfile = {
   fullName: string;
+  stageName: string;
+  headline: string;
   profilePictureUrl: string;
   coverBannerUrl: string;
   artForm: string;
   artSubForms: string[];
+  skills: string[];
+  genres: string[];
+  instruments: string[];
+  groupType: string;
   bio: string;
   state: string;
   city: string;
   country: string;
   area: string;
+  travelPreference: string;
   youtubeVideos: string[];
   youtubeVideoCaptions?: string[];
   performanceImageUrls: string[];
   performanceImageCaptions?: string[];
   phone: string;
   email: string;
+  website: string;
+  preferredContactMethod: string;
   instagram: string;
   facebook: string;
   youtube: string;
@@ -53,27 +62,45 @@ export type ArtistProfile = {
   languages: string[];
   eventTypes: string[];
   priceRange: string;
+  pricingUnit: string;
+  priceNegotiable: boolean;
+  availabilityStatus: string;
+  workMode: string;
+  bookingTypes: string[];
+  travelAvailable: boolean;
+  eventDuration: string;
+  equipmentInfo: string;
+  status: "draft" | "published";
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mapArtistRow(d: any): ArtistProfile {
   return {
     fullName: d.full_name ?? "",
+    stageName: d.stage_name ?? "",
+    headline: d.headline ?? "",
     profilePictureUrl: d.profile_picture_url ?? "",
     coverBannerUrl: d.cover_banner_url ?? "",
     artForm: d.art_form ?? "",
     artSubForms: d.art_sub_forms ?? [],
+    skills: d.skills ?? [],
+    genres: d.genres ?? [],
+    instruments: d.instruments ?? [],
+    groupType: d.group_type ?? "",
     bio: d.bio ?? "",
     state: d.state ?? "",
     city: d.city ?? "",
     country: d.country ?? "India",
     area: d.area ?? "",
+    travelPreference: d.travel_preference ?? "",
     youtubeVideos: d.youtube_videos ?? [],
     youtubeVideoCaptions: d.youtube_video_captions ?? [],
     performanceImageUrls: d.performance_image_urls ?? [],
     performanceImageCaptions: d.performance_image_captions ?? [],
     phone: d.phone ?? "",
     email: d.email ?? "",
+    website: d.website ?? "",
+    preferredContactMethod: d.preferred_contact_method ?? "",
     instagram: d.instagram ?? "",
     facebook: d.facebook ?? "",
     youtube: d.youtube ?? "",
@@ -81,5 +108,14 @@ export function mapArtistRow(d: any): ArtistProfile {
     languages: d.languages ?? [],
     eventTypes: d.event_types ?? [],
     priceRange: d.price_range ?? "",
+    pricingUnit: d.pricing_unit ?? "",
+    priceNegotiable: d.price_negotiable ?? false,
+    availabilityStatus: d.availability_status ?? "",
+    workMode: d.work_mode ?? "",
+    bookingTypes: d.booking_types ?? [],
+    travelAvailable: d.travel_available ?? false,
+    eventDuration: d.event_duration ?? "",
+    equipmentInfo: d.equipment_info ?? "",
+    status: d.status === "published" ? "published" : "draft",
   };
 }

@@ -4,10 +4,11 @@ export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
   hint?: string;
   error?: string;
+  optional?: boolean;
 };
 
 const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, hint, error, className = "", id, ...rest },
+  { label, hint, error, optional, className = "", id, ...rest },
   ref
 ) {
   const autoId = useId();
@@ -17,7 +18,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     <div className="w-full">
       {label && (
         <label htmlFor={inputId} className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
-          {label}
+          {label} {optional && <span className="text-[var(--color-text-secondary)] font-normal">(optional)</span>}
         </label>
       )}
       <input
