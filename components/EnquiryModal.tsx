@@ -59,7 +59,7 @@ export default function EnquiryModal({
       {sent ? (
         <>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            Your enquiry has been sent. The artist will get back to you using the contact details on their profile.
+            Your enquiry has been sent. You&apos;ll be notified here once the artist responds — if they&apos;re interested or need more details, a private conversation opens inside ArtiSync. Contact details are never shared without both sides&apos; consent.
           </p>
           <Button type="button" variant="primary" size="md" fullWidth className="mt-6" onClick={handleClose}>
             Done

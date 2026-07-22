@@ -30,6 +30,7 @@ export default function DashboardPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<ArtistProfile | null>(null);
   const [enquiries, setEnquiries] = useState<Enquiry[] | null>(null);
+  const [newEnquiryCount, setNewEnquiryCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [togglingStatus, setTogglingStatus] = useState(false);
 
@@ -54,6 +55,14 @@ export default function DashboardPage() {
         .limit(5);
       if (cancelled) return;
       setEnquiries(enq ?? []);
+
+      const { count } = await supabase
+        .from("enquiries")
+        .select("id", { count: "exact", head: true })
+        .eq("artist_id", u.id)
+        .eq("status", "new");
+      if (cancelled) return;
+      setNewEnquiryCount(count ?? 0);
       setLoading(false);
     }
 
@@ -104,7 +113,7 @@ export default function DashboardPage() {
     { title: "Update Availability", description: "Keep your booking status current.", href: "/create-profile?step=4", icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /> },
     { title: "Edit Pricing", description: "Update your rates and pricing details.", href: "/create-profile?step=4", icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33" /> },
     { title: "Preview Profile", description: "See exactly what clients see when they find you.", href: `/artist/${userId}`, icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /> },
-    { title: "Manage Enquiries", description: "Review enquiries from clients.", href: "#enquiries", icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" /> },
+    { title: "Manage Enquiries", description: "Review enquiries from clients.", href: "/artist/enquiries", icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" /> },
   ];
 
   return (
@@ -194,7 +203,13 @@ export default function DashboardPage() {
 
         {/* 4. Enquiries */}
         <div id="enquiries">
-          <h2 className="text-base font-semibold text-[var(--color-text)] mb-4">Recent enquiries</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-[var(--color-text)] flex items-center gap-2">
+              Recent enquiries
+              {newEnquiryCount > 0 && <Badge variant="accent">{newEnquiryCount} new</Badge>}
+            </h2>
+            <Button href="/artist/enquiries" variant="ghost" size="sm">View all</Button>
+          </div>
           {!enquiries || enquiries.length === 0 ? (
             <Card className="p-6">
               <EmptyState

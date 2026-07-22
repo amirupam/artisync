@@ -35,17 +35,30 @@ export default function SavedArtistsPage() {
       if (artistRow) { router.replace("/dashboard"); return; }
 
       setClientId(u.id);
-      const { data, error: dbError } = await supabase
+      const { data: savedRows, error: savedError } = await supabase
         .from("saved_artists")
-        .select("artist_id, artists(*)")
+        .select("artist_id")
         .eq("client_id", u.id)
         .order("created_at", { ascending: false });
       if (cancelled) return;
-      if (dbError) { setError(dbError.message); setLoading(false); return; }
+      if (savedError) { setError(savedError.message); setLoading(false); return; }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rows = (data ?? []) as any[];
-      setEntries(rows.filter((r) => r.artists).map((r) => ({ id: r.artist_id, data: mapArtistRow(r.artists) })));
+      const artistIds = (savedRows ?? []).map((r) => r.artist_id);
+      if (artistIds.length === 0) { setEntries([]); setLoading(false); return; }
+
+      const { data: artistRows, error: artistsError } = await supabase
+        .from("artists_public")
+        .select("*")
+        .in("id", artistIds);
+      if (cancelled) return;
+      if (artistsError) { setError(artistsError.message); setLoading(false); return; }
+
+      const byId = new Map((artistRows ?? []).map((row) => [row.id, row]));
+      setEntries(
+        artistIds
+          .filter((id) => byId.has(id))
+          .map((id) => ({ id, data: mapArtistRow(byId.get(id)) }))
+      );
       setLoading(false);
     }
 

@@ -145,7 +145,7 @@ export default function ArtistsPage() {
 
   // Artists
   useEffect(() => {
-    supabase.from("artists").select("*").eq("status", "published").then(({ data, error }) => {
+    supabase.from("artists_public").select("*").eq("status", "published").then(({ data, error }) => {
       if (error) { setLoadError(error.message); setLoadingArtists(false); return; }
       const entries: ArtistEntry[] = (data ?? []).map((row) => ({ id: row.id, data: mapArtistRow(row), createdAt: row.created_at, match: null, distanceKm: null }));
       setArtists(entries);
@@ -390,6 +390,7 @@ export default function ArtistsPage() {
           </div>
           {clientId ? (
             <>
+              <Link href="/client/enquiries" className="flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">Enquiries</Link>
               <Link href="/saved-artists" className="flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">Saved</Link>
               <button onClick={() => supabase.auth.signOut().then(() => router.replace("/"))} className="flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">Sign out</button>
             </>

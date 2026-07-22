@@ -96,7 +96,7 @@ export default function PublicArtistPage() {
 
     (async () => {
       try {
-        const { data: d, error: dbError } = await supabase.from("artists").select("*").eq("id", id).maybeSingle();
+        const { data: d, error: dbError } = await supabase.from("artists_public").select("*").eq("id", id).maybeSingle();
         if (dbError) throw dbError;
         if (d) setProfile(mapArtistRow(d));
         else setError("Artist not found.");
