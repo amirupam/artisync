@@ -16,9 +16,9 @@ import Textarea from "@/components/Textarea";
 import Select from "@/components/Select";
 import TagInput from "@/components/TagInput";
 import Logo from "@/components/Logo";
+import DashboardLink from "@/components/DashboardLink";
 
 const ONBOARDING_DISMISS_KEY = "artisync_artist_onboarding_dismissed";
-const BIO_MAX_LENGTH = 600;
 
 // ─── Configuration values specific to this wizard (shared vocab lives in lib/sharedConfig.ts) ──
 
@@ -87,7 +87,7 @@ function FieldLabel({ children, optional }: { children: React.ReactNode; optiona
 type FormState = {
   fullName: string; stageName: string; headline: string;
   profilePicture: File | null; profilePictureUrl: string;
-  coverBanner: File | null; coverBannerUrl: string;
+  coverBanner: File | null; coverBannerUrl: string; coverBannerPositionY: number;
   artForm: string; artSubForms: string[]; skills: string[]; genres: string[]; instruments: string[]; groupType: string;
   bio: string;
   state: string; city: string; area: string; country: string; travelPreference: string;
@@ -103,7 +103,7 @@ type FormState = {
 const EMPTY_FORM: FormState = {
   fullName: "", stageName: "", headline: "",
   profilePicture: null, profilePictureUrl: "",
-  coverBanner: null, coverBannerUrl: "",
+  coverBanner: null, coverBannerUrl: "", coverBannerPositionY: 50,
   artForm: "", artSubForms: [], skills: [], genres: [], instruments: [], groupType: "",
   bio: "",
   state: "", city: "", area: "", country: "India", travelPreference: "",
@@ -141,14 +141,23 @@ export default function CreateProfilePage() {
   const geocodedRef = useRef<{ query: string; lat: number | null; lng: number | null }>({ query: "", lat: null, lng: null });
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [customSpecialization, setCustomSpecialization] = useState("");
+  const [locating, setLocating] = useState(false);
+  const [locationCaptured, setLocationCaptured] = useState(false);
+  const [profilePhotoLightbox, setProfilePhotoLightbox] = useState(false);
+  const [coverDragOver, setCoverDragOver] = useState(false);
+  const [profileDragOver, setProfileDragOver] = useState(false);
+  const coverDragState = useRef<{ startY: number; startPos: number } | null>(null);
 
   // ── Load session + existing profile ──────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
+    let initialized = false;
 
     async function handleUser(u: { id: string; email?: string | null } | null | undefined) {
       if (cancelled) return;
       if (!u) { router.replace({ pathname: "/signup", query: { role: "artist" } }); return; }
+      initialized = true;
       stripOAuthHashIfPresent();
       setUserId(u.id);
       setForm((p) => ({ ...p, email: u.email ?? p.email }));
@@ -160,6 +169,7 @@ export default function CreateProfilePage() {
             ...EMPTY_FORM,
             fullName: d.full_name ?? "", stageName: d.stage_name ?? "", headline: d.headline ?? "",
             profilePictureUrl: d.profile_picture_url ?? "", coverBannerUrl: d.cover_banner_url ?? "",
+            coverBannerPositionY: typeof d.cover_banner_position_y === "number" ? d.cover_banner_position_y : 50,
             artForm: d.art_form ?? "", artSubForms: d.art_sub_forms ?? [], skills: d.skills ?? [], genres: d.genres ?? [], instruments: d.instruments ?? [], groupType: d.group_type ?? "",
             bio: d.bio ?? "",
             state: d.state ?? "", city: d.city ?? "", area: d.area ?? "", country: d.country ?? "India", travelPreference: d.travel_preference ?? "",
@@ -180,11 +190,15 @@ export default function CreateProfilePage() {
             status: d.status === "published" ? "published" : "draft",
           };
           setForm(loaded);
+          const loadedSubForms = ART_FORMS[loaded.artForm] ?? [];
+          const existingCustomSpecialization = loaded.artSubForms.find((v) => !loadedSubForms.includes(v));
+          if (existingCustomSpecialization) setCustomSpecialization(existingCustomSpecialization);
           geocodedRef.current = {
             query: [loaded.area, loaded.city, loaded.state, "India"].filter(Boolean).join(", "),
             lat: typeof d.latitude === "number" ? d.latitude : null,
             lng: typeof d.longitude === "number" ? d.longitude : null,
           };
+          setLocationCaptured(geocodedRef.current.lat != null && geocodedRef.current.lng != null);
           setProfileSaved(true);
           const { nextIncompleteSection } = getArtistProfileCompleteness(loaded);
           const requestedStep = Number(router.query.step);
@@ -200,8 +214,15 @@ export default function CreateProfilePage() {
     }
 
     supabase.auth.getSession().then(({ data: { session } }) => handleUser(session?.user));
+    // Once the profile has loaded, ignore further auth events (token
+    // refresh fires periodically and whenever the tab regains focus) —
+    // reprocessing them reloaded the form from the database and reset the
+    // wizard to whatever step/selections were last saved, silently
+    // discarding in-progress edits (unsaved chip selections, the step you
+    // were on, etc). Only a genuine sign-out still needs to redirect away.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "INITIAL_SESSION") return;
+      if (event === "SIGNED_OUT") { handleUser(null); return; }
+      if (initialized || event === "INITIAL_SESSION") return;
       handleUser(session?.user);
     });
     return () => { cancelled = true; subscription.unsubscribe(); };
@@ -339,7 +360,7 @@ export default function CreateProfilePage() {
       const { error: dbError } = await supabase.from("artists").upsert({
         id: userId,
         full_name: form.fullName, stage_name: form.stageName, headline: form.headline,
-        profile_picture_url: profilePictureUrl, cover_banner_url: coverBannerUrl,
+        profile_picture_url: profilePictureUrl, cover_banner_url: coverBannerUrl, cover_banner_position_y: form.coverBannerPositionY,
         art_form: form.artForm, art_sub_forms: form.artSubForms, skills: form.skills, genres: form.genres, instruments: form.instruments, group_type: form.groupType,
         bio: form.bio,
         state: form.state, city: form.city, area: form.area, country: form.country, travel_preference: form.travelPreference,
@@ -442,11 +463,14 @@ export default function CreateProfilePage() {
               <div className="h-full rounded-full bg-[var(--color-accent)] transition-all duration-500" style={{ width: `${completeness.percentage}%` }} />
             </div>
           </div>
-          {profileSaved ? (
-            <Button href="/profile-preview" variant="ghost" size="sm">Preview</Button>
-          ) : (
-            <Button type="button" variant="ghost" size="sm" disabled>Preview</Button>
-          )}
+          <div className="flex items-center gap-3">
+            <DashboardLink />
+            {profileSaved ? (
+              <Button href="/profile-preview" variant="ghost" size="sm">Preview</Button>
+            ) : (
+              <Button type="button" variant="ghost" size="sm" disabled>Preview</Button>
+            )}
+          </div>
         </Container>
       </header>
 
@@ -478,10 +502,29 @@ export default function CreateProfilePage() {
               <div>
                 <FieldLabel>Profile photograph</FieldLabel>
                 <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden flex-shrink-0">
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setProfileDragOver(true); }}
+                    onDragLeave={() => setProfileDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setProfileDragOver(false);
+                      const f = e.dataTransfer.files?.[0];
+                      if (f && f.type.startsWith("image/")) update("profilePicture", f);
+                    }}
+                    className={`relative w-20 h-20 rounded-full border-2 bg-[var(--color-surface)] overflow-hidden flex-shrink-0 transition-colors ${
+                      profileDragOver ? "border-[var(--color-accent)] border-dashed" : "border-[var(--color-border)]"
+                    }`}
+                  >
                     {(form.profilePicture || form.profilePictureUrl) ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={form.profilePicture ? URL.createObjectURL(form.profilePicture) : form.profilePictureUrl} alt="Profile" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setProfilePhotoLightbox(true)}
+                        className="w-full h-full block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                        aria-label="View full profile photo"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={form.profilePicture ? URL.createObjectURL(form.profilePicture) : form.profilePictureUrl} alt="Profile" className="w-full h-full object-cover" />
+                      </button>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-[var(--color-text-secondary)]">
                         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -497,26 +540,37 @@ export default function CreateProfilePage() {
                         {form.profilePicture || form.profilePictureUrl ? "Change photo" : "Upload photo"}
                       </span>
                     </label>
-                    <p className="mt-1.5 text-xs text-[var(--color-text-secondary)]">JPG or PNG, up to 5MB.</p>
+                    <p className="mt-1.5 text-xs text-[var(--color-text-secondary)]">JPG or PNG, up to 5MB. Drag and drop onto the circle, or click it to view full size.</p>
                   </div>
                 </div>
               </div>
+
+              {profilePhotoLightbox && (form.profilePicture || form.profilePictureUrl) && (
+                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4" onClick={() => setProfilePhotoLightbox(false)}>
+                  <button type="button" onClick={() => setProfilePhotoLightbox(false)} aria-label="Close" className="absolute top-4 right-4 text-white/80 hover:text-white">
+                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={form.profilePicture ? URL.createObjectURL(form.profilePicture) : form.profilePictureUrl}
+                    alt="Profile"
+                    className="max-h-[85vh] max-w-full rounded-[var(--radius-md)] object-contain"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              )}
 
               <Input label="Artist name" required value={form.fullName} onChange={(e) => update("fullName", e.target.value)} error={stepErrors.fullName} />
               <Input label="Stage name" optional hint="If different from your artist name." value={form.stageName} onChange={(e) => update("stageName", e.target.value)} />
               <Input label="Professional headline" hint='e.g. "Bollywood playback singer for weddings & events"' value={form.headline} onChange={(e) => update("headline", e.target.value)} />
 
-              <div>
-                <Textarea
-                  label="Biography"
-                  value={form.bio}
-                  maxLength={BIO_MAX_LENGTH}
-                  onChange={(e) => update("bio", e.target.value)}
-                  hint="Describe your style, experience, and what makes you unique."
-                  rows={5}
-                />
-                <p className="mt-1 text-right text-xs text-[var(--color-text-secondary)]">{form.bio.length}/{BIO_MAX_LENGTH}</p>
-              </div>
+              <Textarea
+                label="Biography"
+                value={form.bio}
+                onChange={(e) => update("bio", e.target.value)}
+                hint="Describe your style, experience, and what makes you unique."
+                rows={5}
+              />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Select label="State" value={form.state} onChange={(e) => { update("state", e.target.value); update("city", ""); }}>
@@ -533,6 +587,35 @@ export default function CreateProfilePage() {
                 )}
               </div>
               <Input label="Locality / Area" hint="e.g. Bandra, Koramangala, Salt Lake…" value={form.area} onChange={(e) => update("area", e.target.value)} />
+
+              <div>
+                <button
+                  type="button"
+                  disabled={locating}
+                  onClick={() => {
+                    if (!navigator.geolocation) return;
+                    setLocating(true);
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        const locationQuery = [form.area, form.city, form.state, "India"].filter(Boolean).join(", ");
+                        geocodedRef.current = { query: locationQuery, lat: pos.coords.latitude, lng: pos.coords.longitude };
+                        setLocationCaptured(true);
+                        setLocating(false);
+                      },
+                      () => setLocating(false),
+                      { timeout: 10000 }
+                    );
+                  }}
+                  className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] hover:bg-[var(--color-primary-soft)] disabled:opacity-60"
+                >
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
+                  {locating ? "Locating…" : locationCaptured ? "Update my approximate location" : "Use my approximate location"}
+                </button>
+                {locationCaptured && (
+                  <p className="mt-1.5 text-xs text-[var(--color-success)]">✓ Location captured — this is what lets clients see distance to you.</p>
+                )}
+                <p className="mt-1.5 text-xs text-[var(--color-text-secondary)]">We only use this to show clients an approximate distance — never your exact address.</p>
+              </div>
               <Select label="Travel location preference" value={form.travelPreference} onChange={(e) => update("travelPreference", e.target.value)}>
                 <option value="">Select preference</option>
                 {TRAVEL_PREFERENCES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -552,7 +635,7 @@ export default function CreateProfilePage() {
                 <FieldLabel>Primary art form</FieldLabel>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {Object.keys(ART_FORMS).map((af) => (
-                    <button key={af} type="button" onClick={() => { update("artForm", af); update("artSubForms", []); }}
+                    <button key={af} type="button" onClick={() => { update("artForm", af); update("artSubForms", []); setCustomSpecialization(""); }}
                       className={`min-h-[44px] px-2 rounded-[var(--radius-md)] text-sm font-medium border text-center transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${
                         form.artForm === af ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]" : "bg-[var(--color-surface)] text-[var(--color-text-secondary)] border-[var(--color-border)] hover:border-[var(--color-primary)]"
                       }`}>
@@ -562,12 +645,44 @@ export default function CreateProfilePage() {
                 </div>
               </div>
 
-              {subForms.length > 0 && (
-                <div>
-                  <FieldLabel optional>Specializations</FieldLabel>
-                  <MultiChip options={subForms} selected={form.artSubForms} onChange={(v) => update("artSubForms", v)} />
-                </div>
-              )}
+              {subForms.length > 0 && (() => {
+                const chipOptions = [...subForms, "Other"];
+                const chipSelected = [
+                  ...form.artSubForms.filter((v) => subForms.includes(v)),
+                  ...(form.artSubForms.some((v) => !subForms.includes(v)) ? ["Other"] : []),
+                ];
+                return (
+                  <div>
+                    <FieldLabel optional>Specializations</FieldLabel>
+                    <MultiChip
+                      options={chipOptions}
+                      selected={chipSelected}
+                      onChange={(next) => {
+                        const canonical = next.filter((v) => v !== "Other");
+                        if (next.includes("Other")) {
+                          update("artSubForms", customSpecialization.trim() ? [...canonical, customSpecialization.trim()] : canonical);
+                        } else {
+                          setCustomSpecialization("");
+                          update("artSubForms", canonical);
+                        }
+                      }}
+                    />
+                    {chipSelected.includes("Other") && (
+                      <Input
+                        className="mt-2"
+                        placeholder="Type your specialization"
+                        value={customSpecialization}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCustomSpecialization(val);
+                          const canonical = form.artSubForms.filter((v) => subForms.includes(v));
+                          update("artSubForms", val.trim() ? [...canonical, val.trim()] : canonical);
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })()}
 
               <TagInput label="Skills" hint="Add your own, or pick a suggestion." suggestions={SKILL_SUGGESTIONS} values={form.skills} onChange={(v) => update("skills", v)} />
               <TagInput label="Style or genre" suggestions={GENRE_SUGGESTIONS} values={form.genres} onChange={(v) => update("genres", v)} />
@@ -598,16 +713,54 @@ export default function CreateProfilePage() {
 
               <div>
                 <FieldLabel>Cover photo</FieldLabel>
-                <div className="relative h-40 rounded-[var(--radius-lg)] overflow-hidden bg-[var(--color-primary-soft)]">
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setCoverDragOver(true); }}
+                  onDragLeave={() => setCoverDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setCoverDragOver(false);
+                    const f = e.dataTransfer.files?.[0];
+                    if (f && f.type.startsWith("image/")) update("coverBanner", f);
+                  }}
+                  onPointerDown={(e) => {
+                    if (!(form.coverBanner || form.coverBannerUrl)) return;
+                    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                    coverDragState.current = { startY: e.clientY, startPos: form.coverBannerPositionY };
+                  }}
+                  onPointerMove={(e) => {
+                    if (!coverDragState.current) return;
+                    const deltaY = e.clientY - coverDragState.current.startY;
+                    const containerHeight = e.currentTarget.clientHeight || 1;
+                    const deltaPercent = (deltaY / containerHeight) * 100;
+                    const next = Math.min(100, Math.max(0, coverDragState.current.startPos - deltaPercent));
+                    update("coverBannerPositionY", next);
+                  }}
+                  onPointerUp={() => { coverDragState.current = null; }}
+                  className={`relative h-56 sm:h-64 rounded-[var(--radius-lg)] overflow-hidden bg-[var(--color-primary-soft)] border-2 transition-colors ${
+                    coverDragOver ? "border-[var(--color-accent)] border-dashed" : "border-transparent"
+                  } ${form.coverBanner || form.coverBannerUrl ? "cursor-move" : ""}`}
+                >
                   {(form.coverBanner || form.coverBannerUrl) && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={form.coverBanner ? URL.createObjectURL(form.coverBanner) : form.coverBannerUrl} alt="Cover" className="w-full h-full object-cover" />
+                    <img
+                      src={form.coverBanner ? URL.createObjectURL(form.coverBanner) : form.coverBannerUrl}
+                      alt="Cover"
+                      draggable={false}
+                      className="w-full h-full object-cover pointer-events-none select-none"
+                      style={{ objectPosition: `center ${form.coverBannerPositionY}%` }}
+                    />
                   )}
                   <input type="file" accept="image/*" id="cover-input" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) update("coverBanner", f); }} />
                   <label htmlFor="cover-input" className="absolute bottom-3 right-3 cursor-pointer rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white hover:bg-black/75">
                     {form.coverBanner || form.coverBannerUrl ? "Change cover" : "+ Add cover photo"}
                   </label>
+                  {(form.coverBanner || form.coverBannerUrl) && (
+                    <span className="absolute bottom-3 left-3 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white">
+                      Drag to reposition
+                    </span>
+                  )}
                 </div>
+                <p className="mt-1.5 text-xs text-[var(--color-text-secondary)]">Drag and drop an image here, or drag the photo itself up/down to adjust what&apos;s visible.</p>
               </div>
 
               <div>

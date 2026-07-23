@@ -15,6 +15,7 @@ import EmptyState from "@/components/EmptyState";
 import SaveArtistButton from "@/components/SaveArtistButton";
 import { useChat } from "@/components/ChatContext";
 import NotificationBell from "@/components/NotificationBell";
+import DashboardLink from "@/components/DashboardLink";
 
 const PAGE_SIZE = 12;
 
@@ -397,6 +398,7 @@ export default function ArtistsPage() {
           </div>
           {clientId ? (
             <>
+              <DashboardLink />
               {isClient && (
                 <>
                   <NotificationBell />

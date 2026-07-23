@@ -15,12 +15,6 @@ export async function hasClientIdentity(userId: string): Promise<boolean> {
   return !!data;
 }
 
-/** Has the client completed (or saved any of) the artist-matching preference wizard? */
-export async function hasClientPreferences(userId: string): Promise<boolean> {
-  const { data } = await supabase.from("client_preferences").select("client_id").eq("client_id", userId).maybeSingle();
-  return !!data;
-}
-
 /**
  * Central place that decides where an authenticated user should land.
  * An existing artist/client row takes precedence over the role the user
@@ -30,10 +24,11 @@ export async function hasClientPreferences(userId: string): Promise<boolean> {
 export async function resolveEntryPath(userId: string, intendedRole: EntryRole): Promise<string> {
   const [isArtist, isClient] = await Promise.all([hasArtistProfile(userId), hasClientIdentity(userId)]);
   if (isArtist) return "/dashboard";
-  if (isClient) {
-    if (typeof window !== "undefined" && sessionStorage.getItem(CLIENT_PREFS_DISMISS_KEY) === "1") return "/artists";
-    const hasPrefs = await hasClientPreferences(userId);
-    return hasPrefs ? "/artists" : "/client-preferences";
-  }
+  // Clients go straight to browsing — job-specific details (event type,
+  // date, budget, etc.) are now collected on /post-job itself, not as an
+  // upfront preference wizard every client used to be routed through.
+  // /client-preferences still exists for anyone who wants personalized
+  // match scoring, just reachable by choice rather than as a gate.
+  if (isClient) return "/artists";
   return intendedRole === "client" ? "/client-onboarding" : "/create-profile";
 }

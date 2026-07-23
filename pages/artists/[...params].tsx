@@ -15,6 +15,7 @@ import Card from "@/components/Card";
 import EmptyState from "@/components/EmptyState";
 import SaveArtistButton from "@/components/SaveArtistButton";
 import { useChat } from "@/components/ChatContext";
+import DashboardLink from "@/components/DashboardLink";
 import { useToast } from "@/components/Toast";
 import { generateArtistSummary } from "@/lib/artistSummary";
 import { buildArtistTitle, buildArtistDescription, buildListingTitle, buildListingDescription, LISTING_INDEX_THRESHOLD } from "@/lib/seoMeta";
@@ -269,7 +270,10 @@ function ArtistProfileView({ profile }: { profile: ArtistProfile }) {
           </Link>
         </div>
         {userId ? (
-          <button onClick={() => supabase.auth.signOut()} className="text-xs font-semibold text-white/70 hover:text-white transition-colors">Sign out</button>
+          <div className="flex items-center gap-4">
+            <DashboardLink className="!text-white/80 hover:!text-white" />
+            <button onClick={() => supabase.auth.signOut()} className="text-xs font-semibold text-white/70 hover:text-white transition-colors">Sign out</button>
+          </div>
         ) : (
           <Link href={{ pathname: "/signup", query: { role: "client" } }} className="text-xs font-semibold px-4 py-2 bg-[var(--color-accent)] text-white rounded-[var(--radius-md)] hover:bg-[var(--color-accent-hover)] transition-all">
             Sign in
@@ -310,7 +314,7 @@ function ArtistProfileView({ profile }: { profile: ArtistProfile }) {
       <div className="relative mt-2">
         <div className="relative h-52 sm:h-72 w-full overflow-hidden bg-gradient-to-br from-[var(--color-primary)] via-[var(--color-secondary)] to-[var(--color-primary)]">
           {profile.coverBannerUrl && (
-            <Image src={profile.coverBannerUrl} alt="" fill priority sizes="100vw" className="object-cover object-center" />
+            <Image src={profile.coverBannerUrl} alt="" fill priority sizes="100vw" className="object-cover" style={{ objectPosition: `center ${profile.coverBannerPositionY}%` }} />
           )}
         </div>
         {profile.profilePictureUrl && (

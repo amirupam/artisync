@@ -37,6 +37,8 @@ export type ArtistProfile = {
   headline: string;
   profilePictureUrl: string;
   coverBannerUrl: string;
+  /** Vertical crop offset (0-100) for the cover banner, set by dragging in the profile editor. */
+  coverBannerPositionY: number;
   artForm: string;
   artSubForms: string[];
   skills: string[];
@@ -94,6 +96,7 @@ export function mapArtistRow(d: any): ArtistProfile {
     headline: d.headline ?? "",
     profilePictureUrl: d.profile_picture_url ?? "",
     coverBannerUrl: d.cover_banner_url ?? "",
+    coverBannerPositionY: typeof d.cover_banner_position_y === "number" ? d.cover_banner_position_y : 50,
     artForm: d.art_form ?? "",
     artSubForms: d.art_sub_forms ?? [],
     skills: d.skills ?? [],
