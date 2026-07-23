@@ -328,6 +328,9 @@ export default function CreateProfilePage() {
   function validateStep(step: number): boolean {
     const errs: Record<string, string> = {};
     if (step === 1 && !form.fullName.trim()) errs.fullName = "Your name is required.";
+    if (step === 1 && !slugifyUsername(form.username)) errs.username = "Username is required.";
+    if (step === 1 && usernameStatus === "taken") errs.username = "This username is already taken — please choose another.";
+    if (step === 1 && usernameStatus === "checking") errs.username = "Still checking username availability — please wait a moment.";
     if (step === 5) {
       if (!form.phone.trim()) errs.phone = "Phone number is required.";
       if (!form.email.trim()) errs.email = "Email address is required.";
@@ -589,10 +592,11 @@ export default function CreateProfilePage() {
               <div>
                 <Input
                   label="Username"
-                  optional
+                  required
                   placeholder="yourname"
                   value={form.username}
                   onChange={(e) => update("username", e.target.value)}
+                  error={stepErrors.username}
                 />
                 <p className="mt-1.5 text-xs text-[var(--color-text-secondary)]">
                   Your public profile will be at{" "}
@@ -601,7 +605,7 @@ export default function CreateProfilePage() {
                 {usernameStatus === "checking" && (
                   <p className="mt-1 text-xs text-[var(--color-text-secondary)]">Checking availability…</p>
                 )}
-                {usernameStatus === "taken" && (
+                {usernameStatus === "taken" && !stepErrors.username && (
                   <p className="mt-1 text-xs text-[var(--color-error)]">This username is already taken — please choose another.</p>
                 )}
                 {usernameStatus === "available" && (
