@@ -8,7 +8,10 @@ import { Html, Head, Main, NextScript } from "next/document";
 export default function Document() {
   return (
     <Html lang="en">
-      <Head />
+      <Head>
+        <link rel="icon" type="image/png" href="/logo_2.png" />
+        <link rel="apple-touch-icon" href="/logo_2.png" />
+      </Head>
       <body className="antialiased">
         <Main />
         <NextScript />
