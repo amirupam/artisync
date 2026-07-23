@@ -30,6 +30,8 @@ export const supabase = getSupabaseClient();
 export const ARTIST_MEDIA_BUCKET = "artist-media";
 
 export type ArtistProfile = {
+  id: string;
+  slug: string;
   fullName: string;
   stageName: string;
   headline: string;
@@ -74,11 +76,19 @@ export type ArtistProfile = {
   /** Geocoded from city/locality, never a street address. Not exposed in any UI — only used to compute distance. */
   latitude: number | null;
   longitude: number | null;
+  updatedAt: string;
+  /** Computed in Postgres from the full private row (schema_v10.sql) — a
+   * profile can be published but still not indexable if it doesn't meet
+   * the minimum completeness bar. Absent (undefined) on rows fetched from
+   * the base `artists` table, which don't include this computed column. */
+  isIndexable?: boolean;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mapArtistRow(d: any): ArtistProfile {
   return {
+    id: d.id ?? "",
+    slug: d.slug ?? "",
     fullName: d.full_name ?? "",
     stageName: d.stage_name ?? "",
     headline: d.headline ?? "",
@@ -122,5 +132,7 @@ export function mapArtistRow(d: any): ArtistProfile {
     status: d.status === "published" ? "published" : "draft",
     latitude: typeof d.latitude === "number" ? d.latitude : null,
     longitude: typeof d.longitude === "number" ? d.longitude : null,
+    updatedAt: d.updated_at ?? "",
+    isIndexable: typeof d.is_indexable === "boolean" ? d.is_indexable : undefined,
   };
 }

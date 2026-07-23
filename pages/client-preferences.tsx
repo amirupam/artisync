@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { geocodeLocation } from "@/lib/geocode";
 import { CLIENT_PREFS_DISMISS_KEY } from "@/lib/roleRouting";
 import { EMPTY_CLIENT_PREFERENCES, mapClientPreferencesRow, toClientPreferencesRow, type ClientPreferences } from "@/lib/clientPreferences";
-import { ARTIST_CATEGORIES, CLIENT_EVENT_TYPES, LANGUAGES, BUDGET_RANGES, PERFORMANCE_MODES, GROUP_TYPE_OPTIONS, EXPERIENCE_PREFERENCES } from "@/lib/sharedConfig";
+import { ARTIST_CATEGORIES, EVENT_TYPES, LANGUAGES, BUDGET_RANGES, PERFORMANCE_MODES, GROUP_TYPE_OPTIONS, EXPERIENCE_PREFERENCES, INDIA_STATES } from "@/lib/sharedConfig";
 import { stripOAuthHashIfPresent } from "@/lib/stripOAuthHash";
 import { useToast } from "@/components/Toast";
 import Container from "@/components/Container";
@@ -17,17 +17,9 @@ import StepIndicator from "@/components/StepIndicator";
 import Logo from "@/components/Logo";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import Badge from "@/components/Badge";
+import NoIndexMeta from "@/components/NoIndexMeta";
 
 const STEP_LABELS = ["Artist Type", "Event", "Location & Mode", "Date & Duration", "Budget", "Preferences & Review"];
-
-const INDIA_STATES: Record<string, string[]> = {
-  "Andhra Pradesh": ["Vijayawada","Visakhapatnam","Guntur"], "Assam": ["Guwahati","Silchar"],
-  "Bihar": ["Patna","Gaya"], "Delhi": ["New Delhi","South Delhi"], "Goa": ["Panaji","Margao"],
-  "Gujarat": ["Ahmedabad","Surat","Vadodara"], "Karnataka": ["Bengaluru","Mysuru"], "Kerala": ["Kochi","Thiruvananthapuram"],
-  "Maharashtra": ["Mumbai","Pune","Nagpur","Nashik"], "Punjab": ["Ludhiana","Amritsar"], "Rajasthan": ["Jaipur","Jodhpur"],
-  "Tamil Nadu": ["Chennai","Coimbatore"], "Telangana": ["Hyderabad","Warangal"], "Uttar Pradesh": ["Lucknow","Noida","Ghaziabad"],
-  "West Bengal": ["Kolkata","Howrah"],
-};
 
 function MultiChip({ options, selected, onChange }: { options: string[]; selected: string[]; onChange: (v: string[]) => void }) {
   return (
@@ -162,7 +154,7 @@ export default function ClientPreferencesPage() {
   }
 
   if (checking) {
-    return <div className="min-h-screen flex items-center justify-center bg-[var(--color-page)]"><LoadingSpinner size="lg" label="Loading" /></div>;
+    return <div className="min-h-screen flex items-center justify-center bg-[var(--color-page)]"><NoIndexMeta /><LoadingSpinner size="lg" label="Loading" /></div>;
   }
 
   const stateCities = form.state ? (INDIA_STATES[form.state] ?? []) : [];
@@ -171,6 +163,7 @@ export default function ClientPreferencesPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-page)] pb-20">
+      <NoIndexMeta />
       <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-surface)]/95 backdrop-blur">
         <Container className="flex h-16 items-center justify-between gap-4">
           <Logo size="sm" />
@@ -205,7 +198,7 @@ export default function ClientPreferencesPage() {
           {currentStep === 2 && (
             <div>
               <h2 className="text-xl">What are you planning?</h2>
-              <div className="mt-5"><MultiChip options={CLIENT_EVENT_TYPES} selected={form.eventTypes} onChange={(v) => update("eventTypes", v)} /></div>
+              <div className="mt-5"><MultiChip options={EVENT_TYPES} selected={form.eventTypes} onChange={(v) => update("eventTypes", v)} /></div>
             </div>
           )}
 

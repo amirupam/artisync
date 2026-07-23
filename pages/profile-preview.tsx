@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase, mapArtistRow, type ArtistProfile } from "@/lib/supabaseClient";
 import Logo from "@/components/Logo";
+import NoIndexMeta from "@/components/NoIndexMeta";
 
 function getYouTubeId(url: string): string | null {
   if (!url) return null;
@@ -205,12 +206,14 @@ export default function ProfilePreviewPage() {
 
   if (loading) return (
     <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center">
+      <NoIndexMeta />
       <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
   if (error || !profile) return (
     <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center px-4">
+      <NoIndexMeta />
       <div className="text-center">
         <p className="text-gray-400 mb-6">{error ?? "Profile not found."}</p>
         <button onClick={() => router.push("/create-profile")}
@@ -227,6 +230,7 @@ export default function ProfilePreviewPage() {
 
   return (
     <div className="min-h-screen bg-[#f7f3ee]">
+      <NoIndexMeta />
 
       {/* ── Navbar ── */}
       <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between px-5 h-14 bg-black/50 backdrop-blur-xl">

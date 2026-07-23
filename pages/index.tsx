@@ -1,10 +1,13 @@
 import type { NextPage } from "next";
+import Link from "next/link";
 import Container from "@/components/Container";
 import Button from "@/components/Button";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import AppHeader from "@/components/AppHeader";
 import Footer from "@/components/Footer";
+import { ARTIST_CATEGORIES } from "@/lib/sharedConfig";
+import { slugify } from "@/lib/slugify";
 
 const BENEFITS = [
   {
@@ -35,12 +38,6 @@ const BENEFITS = [
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8.25 10.5h7.5m-7.5 3H12M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     ),
   },
-];
-
-const CATEGORIES = [
-  "Singer", "Musician", "Band", "Dancer", "DJ", "Actor",
-  "Theatre Artist", "Comedian", "Magician", "Anchor or Emcee",
-  "Photographer", "Visual Artist",
 ];
 
 const CLIENT_STEPS = [
@@ -162,10 +159,12 @@ const Home: NextPage = () => {
             </p>
           </div>
           <div className="mt-9 flex flex-wrap justify-center gap-2.5">
-            {CATEGORIES.map((c) => (
-              <Badge key={c} variant="neutral" className="text-sm normal-case tracking-normal px-4 py-2">
-                {c}
-              </Badge>
+            {ARTIST_CATEGORIES.map((c) => (
+              <Link key={c} href={`/artists/${slugify(c)}`} className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] rounded-full">
+                <Badge variant="neutral" className="text-sm normal-case tracking-normal px-4 py-2 hover:bg-[var(--color-primary)] hover:text-white transition-colors cursor-pointer">
+                  {c}s
+                </Badge>
+              </Link>
             ))}
           </div>
         </Container>

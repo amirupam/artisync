@@ -1,12 +1,14 @@
 import { Html, Head, Main, NextScript } from "next/document";
 
+// No <title>/<meta description> here — a hardcoded document-level title
+// silently wins over every page's own next/head metadata (confirmed: it
+// suppressed the unique per-artist and per-listing titles added in the SEO
+// work). Defaults now live in _app.tsx, where individual pages can override
+// them via their own next/head.
 export default function Document() {
   return (
     <Html lang="en">
-      <Head>
-        <title>ArtiSync — Discover talent. Create together.</title>
-        <meta name="description" content="ArtiSync connects clients with talented artists for events, performances, and creative collaborations." />
-      </Head>
+      <Head />
       <body className="antialiased">
         <Main />
         <NextScript />

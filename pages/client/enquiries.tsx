@@ -10,6 +10,7 @@ import Card from "@/components/Card";
 import Badge from "@/components/Badge";
 import EmptyState from "@/components/EmptyState";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import NoIndexMeta from "@/components/NoIndexMeta";
 
 const STATUS_BADGE: Record<string, "neutral" | "accent" | "success" | "warning" | "error"> = {
   new: "accent",
@@ -62,6 +63,7 @@ export default function ClientEnquiriesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--color-page)] flex items-center justify-center">
+        <NoIndexMeta />
         <LoadingSpinner size="lg" label="Loading" />
       </div>
     );
@@ -69,6 +71,7 @@ export default function ClientEnquiriesPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-page)]">
+      <NoIndexMeta />
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <Container className="flex h-16 items-center justify-between">
           <Logo size="md" />

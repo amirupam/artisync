@@ -12,6 +12,7 @@ import Modal from "@/components/Modal";
 import Badge from "@/components/Badge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useToast } from "@/components/Toast";
+import NoIndexMeta from "@/components/NoIndexMeta";
 
 const CHAT_BUCKET = "chat-attachments";
 
@@ -221,12 +222,13 @@ export default function ConversationPage() {
   }
 
   if (loading) {
-    return <div className="min-h-screen bg-[var(--color-page)] flex items-center justify-center"><LoadingSpinner size="lg" label="Loading" /></div>;
+    return <div className="min-h-screen bg-[var(--color-page)] flex items-center justify-center"><NoIndexMeta /><LoadingSpinner size="lg" label="Loading" /></div>;
   }
 
   if (notFound || !conversation) {
     return (
       <div className="min-h-screen bg-[var(--color-page)] flex items-center justify-center px-4">
+        <NoIndexMeta />
         <div className="text-center">
           <p className="text-lg font-semibold text-[var(--color-text)]">This conversation isn&apos;t available.</p>
           <p className="mt-2 text-sm text-[var(--color-text-secondary)]">It may not have opened yet, or you may not have access to it.</p>
@@ -243,6 +245,7 @@ export default function ConversationPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-page)] flex flex-col">
+      <NoIndexMeta />
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <Container className="flex flex-wrap gap-y-2 min-h-16 items-center justify-between py-2">
           <div className="flex items-center gap-3 min-w-0">

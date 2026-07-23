@@ -7,6 +7,7 @@ import Container from "@/components/Container";
 import Button from "@/components/Button";
 import PasswordInput from "@/components/PasswordInput";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import NoIndexMeta from "@/components/NoIndexMeta";
 
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -65,6 +66,7 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-page)] flex flex-col">
+      <NoIndexMeta />
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <Container className="flex h-16 items-center">
           <Logo size="md" />

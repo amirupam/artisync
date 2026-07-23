@@ -45,7 +45,7 @@ function ArtistCard({ entry, clientId, personalized }: { entry: ArtistEntry; cli
 
   return (
     <div className="relative bg-[var(--color-surface)] rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-all overflow-visible">
-      <Link href={`/artist/${id}`} className="block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] rounded-t-[var(--radius-lg)]">
+      <Link href={`/artists/${data.slug || id}`} className="block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] rounded-t-[var(--radius-lg)]">
         <div className="relative h-28 rounded-t-[var(--radius-lg)] overflow-hidden bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-secondary)]">
           {data.coverBannerUrl && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -60,7 +60,7 @@ function ArtistCard({ entry, clientId, personalized }: { entry: ArtistEntry; cli
 
       <div className={`px-4 pb-4 ${data.profilePictureUrl ? "pt-10" : "pt-3"}`}>
         {data.artForm && <span className="text-[10px] font-bold text-[var(--color-accent)] uppercase tracking-widest">{data.artForm}</span>}
-        <Link href={`/artist/${id}`} className="block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] rounded-sm">
+        <Link href={`/artists/${data.slug || id}`} className="block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] rounded-sm">
           <h3 className="font-bold text-[var(--color-text)] text-base leading-tight mt-0.5 truncate">{data.fullName || data.stageName || "Artist"}</h3>
         </Link>
         {specializations.length > 0 && <p className="text-xs text-[var(--color-text-secondary)] mt-0.5 truncate">{specializations.join(" · ")}</p>}
@@ -90,7 +90,7 @@ function ArtistCard({ entry, clientId, personalized }: { entry: ArtistEntry; cli
 
         <div className="mt-3 flex items-center gap-2">
           <SaveArtistButton artistId={id} clientId={clientId} className="!min-h-[36px] !px-3 !text-xs flex-1 justify-center" />
-          <Link href={`/artist/${id}`} className="flex-1 inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-primary)] text-white text-xs font-semibold min-h-[36px] px-3 hover:bg-[var(--color-primary-hover)] transition-colors">
+          <Link href={`/artists/${data.slug || id}`} className="flex-1 inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-primary)] text-white text-xs font-semibold min-h-[36px] px-3 hover:bg-[var(--color-primary-hover)] transition-colors">
             View Profile
           </Link>
         </div>

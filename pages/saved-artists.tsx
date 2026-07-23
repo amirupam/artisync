@@ -10,6 +10,7 @@ import Input from "@/components/Input";
 import EmptyState from "@/components/EmptyState";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import SaveArtistButton from "@/components/SaveArtistButton";
+import NoIndexMeta from "@/components/NoIndexMeta";
 
 type SavedEntry = { id: string; data: ArtistProfile };
 
@@ -83,6 +84,7 @@ export default function SavedArtistsPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-page)]">
+      <NoIndexMeta />
       <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-surface)]/95 backdrop-blur">
         <Container className="flex h-16 items-center justify-between">
           <Logo size="sm" />
@@ -133,7 +135,7 @@ export default function SavedArtistsPage() {
                       <h3 className="font-bold text-[var(--color-text)] truncate">{e.data.fullName || e.data.stageName || "Artist"}</h3>
                       <p className="text-xs text-[var(--color-text-secondary)] truncate">{[e.data.city, e.data.state].filter(Boolean).join(", ")}</p>
                       <div className="mt-3 flex gap-2">
-                        <Link href={`/artist/${e.id}`} className="flex-1 inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-primary)] text-white text-xs font-semibold min-h-[36px] px-3">
+                        <Link href={`/artists/${e.data.slug || e.id}`} className="flex-1 inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-primary)] text-white text-xs font-semibold min-h-[36px] px-3">
                           View Profile
                         </Link>
                         <SaveArtistButton artistId={e.id} clientId={clientId} className="!min-h-[36px] !px-3 !text-xs" onChange={(saved) => handleRemoved(e.id, saved)} />

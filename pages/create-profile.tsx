@@ -4,7 +4,9 @@ import { supabase, ARTIST_MEDIA_BUCKET } from "@/lib/supabaseClient";
 import { getArtistProfileCompleteness } from "@/lib/artistProfileCompleteness";
 import { stripOAuthHashIfPresent } from "@/lib/stripOAuthHash";
 import { geocodeLocation } from "@/lib/geocode";
+import { ART_FORMS, EVENT_TYPES, LANGUAGES, INDIA_STATES } from "@/lib/sharedConfig";
 import ArtistOnboardingCard from "@/components/ArtistOnboardingCard";
+import NoIndexMeta from "@/components/NoIndexMeta";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import StepIndicator from "@/components/StepIndicator";
 import Container from "@/components/Container";
@@ -18,25 +20,8 @@ import Logo from "@/components/Logo";
 const ONBOARDING_DISMISS_KEY = "artisync_artist_onboarding_dismissed";
 const BIO_MAX_LENGTH = 600;
 
-// ─── Shared configuration values ────────────────────────────────────────────
+// ─── Configuration values specific to this wizard (shared vocab lives in lib/sharedConfig.ts) ──
 
-const ART_FORMS: Record<string, string[]> = {
-  Musician: ["Guitarist","Bassist","Drummer","Pianist / Keyboardist","Violinist","Flutist","Tabla Player","Sitar Player","Harmonium Player","Trumpet / Brass Player","Saxophone Player","Percussionist","Sarangi Player","Mandolin Player","Veena Player","Mridangam Player","Shehnai Player","Santoor Player"],
-  Singer: ["Hindustani Classical Vocalist","Carnatic Classical Vocalist","Semi-Classical Singer","Ghazal Singer","Bollywood Singer","Pop Singer","Folk Singer","Devotional / Bhajan Singer","Jazz Singer","R&B / Soul Singer","Rock Singer","Sufi Singer","Qawwali Singer","Indie Singer-Songwriter"],
-  Dancer: ["Bharatanatyam","Kathak","Odissi","Kuchipudi","Manipuri","Mohiniyattam","Sattriya","Classical Ballet","Contemporary","Hip Hop / B-boy","Salsa / Latin","Bollywood Dance","Folk Dance","Flamenco","Tap Dance","Jazz Dance","Freestyle"],
-  "Actor / Theatre": ["Theatre Actor","Street Theatre","Mime Artist","Film Actor","TV / OTT Actor","Puppeteer","Physical Theatre"],
-  Comedian: ["Stand-up Comedy","Sketch Comedy","Improv Comedy","Roast Comedy","Ventriloquism"],
-  Magician: ["Stage Magician","Close-up Magician","Mentalist","Illusionist","Card Magician"],
-  DJ: ["Bollywood DJ","EDM DJ","Hip Hop DJ","House DJ","Techno / Trance DJ","Retro / Old School DJ"],
-  "Anchor / Emcee": ["Wedding Anchor","Corporate Emcee","Event Host","Radio Jockey","Motivational Speaker"],
-  "Visual Artist": ["Painter","Sculptor","Digital Artist","Street / Mural Artist","Sketch Artist","Caricature Artist","Calligrapher","Folk / Warli Art"],
-  "Spoken Word / Poetry": ["Spoken Word Artist","Poet","Storyteller / Kathakar","Slam Poet"],
-  "Circus / Acrobat": ["Acrobat","Fire Artist","Juggler","Aerial Artist","Tightrope Walker","Contortionist"],
-  Photographer: ["Wedding Photographer","Portrait Photographer","Event Photographer","Fine Art Photographer"],
-};
-
-const EVENT_TYPES = ["Wedding","Corporate Event","Birthday Party","Concert / Live Show","College Fest","Private Party","Festival","Cultural Program","Religious Event","Online / Virtual Event","Kids Event","Music Video / Album"];
-const LANGUAGES = ["Hindi","English","Bengali","Tamil","Telugu","Marathi","Gujarati","Kannada","Malayalam","Punjabi","Odia","Urdu","Sanskrit","Bhojpuri","Rajasthani"];
 const EXPERIENCE_OPTIONS = ["Less than 1 year","1–2 years","3–5 years","6–10 years","More than 10 years"];
 const BOOKING_TYPES = ["Full Event","Half Day","Per Session","Per Song / Set","Consultation Only"];
 const AVAILABILITY_STATUSES = ["Available now","Limited availability","Not currently available"];
@@ -47,42 +32,6 @@ const TRAVEL_PREFERENCES = ["Local city only", "Within state", "Anywhere in Indi
 const SKILL_SUGGESTIONS = ["Live performance","Studio recording","Choreography","Teaching / Workshops","Event hosting","Improvisation","Composition","Sound design"];
 const GENRE_SUGGESTIONS = ["Classical","Folk","Bollywood","Pop","Rock","Jazz","Fusion","Devotional","Contemporary","Hip Hop"];
 const INSTRUMENT_SUGGESTIONS = ["Guitar","Piano","Tabla","Violin","Flute","Drums","Sitar","Harmonium","Saxophone","Cajon"];
-
-const INDIA_STATES: Record<string, string[]> = {
-  "Andhra Pradesh": ["Vijayawada","Visakhapatnam","Guntur","Nellore","Tirupati","Kurnool","Rajahmundry","Kakinada","Eluru","Ongole"],
-  "Assam": ["Guwahati","Silchar","Dibrugarh","Jorhat","Tezpur","Tinsukia","Nagaon"],
-  "Bihar": ["Patna","Gaya","Bhagalpur","Muzaffarpur","Purnia","Darbhanga","Arrah"],
-  "Chhattisgarh": ["Raipur","Bhilai","Korba","Bilaspur","Durg","Rajnandgaon"],
-  "Delhi": ["Central Delhi","East Delhi","New Delhi","North Delhi","North East Delhi","North West Delhi","Shahdara","South Delhi","South East Delhi","South West Delhi","West Delhi"],
-  "Goa": ["Panaji","Margao","Vasco da Gama","Mapusa","Ponda"],
-  "Gujarat": ["Ahmedabad","Surat","Vadodara","Rajkot","Bhavnagar","Jamnagar","Gandhinagar","Anand","Junagadh","Bharuch"],
-  "Haryana": ["Gurugram","Faridabad","Rohtak","Hisar","Panipat","Karnal","Ambala","Yamunanagar","Sonipat","Bhiwani"],
-  "Himachal Pradesh": ["Shimla","Manali","Dharamsala","Solan","Kullu","Mandi","Palampur"],
-  "Jharkhand": ["Ranchi","Jamshedpur","Dhanbad","Bokaro","Hazaribag","Deoghar"],
-  "Karnataka": ["Bengaluru","Mysuru","Hubballi","Mangaluru","Belagavi","Davanagere","Ballari","Tumkur","Shivamogga","Vijayapura"],
-  "Kerala": ["Kochi","Thiruvananthapuram","Kozhikode","Thrissur","Kannur","Kollam","Palakkad","Alappuzha","Malappuram","Kottayam"],
-  "Madhya Pradesh": ["Bhopal","Indore","Gwalior","Jabalpur","Ujjain","Ratlam","Sagar","Satna","Dewas","Rewa"],
-  "Maharashtra": ["Mumbai","Pune","Nagpur","Nashik","Thane","Aurangabad","Solapur","Kolhapur","Navi Mumbai","Pimpri-Chinchwad","Amravati","Nanded"],
-  "Manipur": ["Imphal","Thoubal","Bishnupur","Churachandpur"],
-  "Meghalaya": ["Shillong","Tura","Jowai"],
-  "Mizoram": ["Aizawl","Lunglei","Champhai"],
-  "Nagaland": ["Dimapur","Kohima","Mokokchung"],
-  "Odisha": ["Bhubaneswar","Cuttack","Rourkela","Puri","Sambalpur","Berhampur","Brahmapur"],
-  "Punjab": ["Ludhiana","Amritsar","Jalandhar","Patiala","Chandigarh","Mohali","Bathinda","Hoshiarpur"],
-  "Rajasthan": ["Jaipur","Jodhpur","Udaipur","Ajmer","Bikaner","Kota","Alwar","Bharatpur","Sikar","Pali"],
-  "Sikkim": ["Gangtok","Namchi","Mangan"],
-  "Tamil Nadu": ["Chennai","Coimbatore","Madurai","Tiruchirappalli","Salem","Tiruppur","Erode","Tirunelveli","Vellore","Thoothukudi"],
-  "Telangana": ["Hyderabad","Warangal","Nizamabad","Karimnagar","Khammam","Secunderabad","Ramagundam","Nalgonda"],
-  "Tripura": ["Agartala","Udaipur","Dharmanagar"],
-  "Uttar Pradesh": ["Lucknow","Agra","Varanasi","Kanpur","Prayagraj","Meerut","Noida","Ghaziabad","Mathura","Bareilly","Jhansi","Aligarh","Moradabad","Gorakhpur"],
-  "Uttarakhand": ["Dehradun","Haridwar","Roorkee","Rishikesh","Nainital","Haldwani","Rudrapur"],
-  "West Bengal": ["Kolkata","Howrah","Asansol","Siliguri","Durgapur","Bardhaman","Malda","Kharagpur"],
-  "Jammu & Kashmir": ["Srinagar","Jammu","Leh","Anantnag","Sopore"],
-  "Arunachal Pradesh": ["Itanagar","Naharlagun","Pasighat"],
-  "Andaman & Nicobar": ["Port Blair"],
-  "Chandigarh": ["Chandigarh"],
-  "Puducherry": ["Puducherry","Karaikal","Yanam"],
-};
 
 const STEP_LABELS = ["Basic Info", "Art & Skills", "Portfolio", "Availability & Pricing", "Contact & Review"];
 
@@ -473,6 +422,7 @@ export default function CreateProfilePage() {
   if (checkingProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--color-page)]">
+        <NoIndexMeta />
         <LoadingSpinner size="lg" label="Loading your profile" />
       </div>
     );
@@ -480,6 +430,7 @@ export default function CreateProfilePage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-page)] pb-20">
+      <NoIndexMeta />
       <ArtistOnboardingCard open={showOnboarding} onComplete={handleCompleteOnboarding} onLater={handleOnboardingLater} />
 
       {/* ── Top bar ── */}

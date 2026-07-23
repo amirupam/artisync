@@ -21,6 +21,8 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <>
       <Head>
+        <title>ArtiSync — Discover talent. Create together.</title>
+        <meta name="description" content="ArtiSync connects clients with talented artists for events, performances, and creative collaborations." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#141A33" />
       </Head>

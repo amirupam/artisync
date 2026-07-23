@@ -9,42 +9,8 @@ import Button from "@/components/Button";
 import Input from "@/components/Input";
 import Select from "@/components/Select";
 import LoadingSpinner from "@/components/LoadingSpinner";
-
-const INDIA_STATES: Record<string, string[]> = {
-  "Andhra Pradesh": ["Vijayawada","Visakhapatnam","Guntur","Nellore","Tirupati","Kurnool","Rajahmundry","Kakinada","Eluru","Ongole"],
-  "Assam": ["Guwahati","Silchar","Dibrugarh","Jorhat","Tezpur","Tinsukia","Nagaon"],
-  "Bihar": ["Patna","Gaya","Bhagalpur","Muzaffarpur","Purnia","Darbhanga","Arrah"],
-  "Chhattisgarh": ["Raipur","Bhilai","Korba","Bilaspur","Durg","Rajnandgaon"],
-  "Delhi": ["Central Delhi","East Delhi","New Delhi","North Delhi","North East Delhi","North West Delhi","Shahdara","South Delhi","South East Delhi","South West Delhi","West Delhi"],
-  "Goa": ["Panaji","Margao","Vasco da Gama","Mapusa","Ponda"],
-  "Gujarat": ["Ahmedabad","Surat","Vadodara","Rajkot","Bhavnagar","Jamnagar","Gandhinagar","Anand","Junagadh","Bharuch"],
-  "Haryana": ["Gurugram","Faridabad","Rohtak","Hisar","Panipat","Karnal","Ambala","Yamunanagar","Sonipat","Bhiwani"],
-  "Himachal Pradesh": ["Shimla","Manali","Dharamsala","Solan","Kullu","Mandi","Palampur"],
-  "Jharkhand": ["Ranchi","Jamshedpur","Dhanbad","Bokaro","Hazaribag","Deoghar"],
-  "Karnataka": ["Bengaluru","Mysuru","Hubballi","Mangaluru","Belagavi","Davanagere","Ballari","Tumkur","Shivamogga","Vijayapura"],
-  "Kerala": ["Kochi","Thiruvananthapuram","Kozhikode","Thrissur","Kannur","Kollam","Palakkad","Alappuzha","Malappuram","Kottayam"],
-  "Madhya Pradesh": ["Bhopal","Indore","Gwalior","Jabalpur","Ujjain","Ratlam","Sagar","Satna","Dewas","Rewa"],
-  "Maharashtra": ["Mumbai","Pune","Nagpur","Nashik","Thane","Aurangabad","Solapur","Kolhapur","Navi Mumbai","Pimpri-Chinchwad","Amravati","Nanded"],
-  "Manipur": ["Imphal","Thoubal","Bishnupur","Churachandpur"],
-  "Meghalaya": ["Shillong","Tura","Jowai"],
-  "Mizoram": ["Aizawl","Lunglei","Champhai"],
-  "Nagaland": ["Dimapur","Kohima","Mokokchung"],
-  "Odisha": ["Bhubaneswar","Cuttack","Rourkela","Puri","Sambalpur","Berhampur","Brahmapur"],
-  "Punjab": ["Ludhiana","Amritsar","Jalandhar","Patiala","Chandigarh","Mohali","Bathinda","Hoshiarpur"],
-  "Rajasthan": ["Jaipur","Jodhpur","Udaipur","Ajmer","Bikaner","Kota","Alwar","Bharatpur","Sikar","Pali"],
-  "Sikkim": ["Gangtok","Namchi","Mangan"],
-  "Tamil Nadu": ["Chennai","Coimbatore","Madurai","Tiruchirappalli","Salem","Tiruppur","Erode","Tirunelveli","Vellore","Thoothukudi"],
-  "Telangana": ["Hyderabad","Warangal","Nizamabad","Karimnagar","Khammam","Secunderabad","Ramagundam","Nalgonda"],
-  "Tripura": ["Agartala","Udaipur","Dharmanagar"],
-  "Uttar Pradesh": ["Lucknow","Agra","Varanasi","Kanpur","Prayagraj","Meerut","Noida","Ghaziabad","Mathura","Bareilly","Jhansi","Aligarh","Moradabad","Gorakhpur"],
-  "Uttarakhand": ["Dehradun","Haridwar","Roorkee","Rishikesh","Nainital","Haldwani","Rudrapur"],
-  "West Bengal": ["Kolkata","Howrah","Asansol","Siliguri","Durgapur","Bardhaman","Malda","Kharagpur"],
-  "Jammu & Kashmir": ["Srinagar","Jammu","Leh","Anantnag","Sopore"],
-  "Arunachal Pradesh": ["Itanagar","Naharlagun","Pasighat"],
-  "Andaman & Nicobar": ["Port Blair"],
-  "Chandigarh": ["Chandigarh"],
-  "Puducherry": ["Puducherry","Karaikal","Yanam"],
-};
+import NoIndexMeta from "@/components/NoIndexMeta";
+import { INDIA_STATES } from "@/lib/sharedConfig";
 
 export default function ClientOnboardingPage() {
   const router = useRouter();
@@ -115,6 +81,7 @@ export default function ClientOnboardingPage() {
   if (checking) {
     return (
       <div className="min-h-screen bg-[var(--color-page)] flex items-center justify-center">
+        <NoIndexMeta />
         <LoadingSpinner size="lg" label="Loading" />
       </div>
     );
@@ -124,6 +91,7 @@ export default function ClientOnboardingPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-page)] flex flex-col">
+      <NoIndexMeta />
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <Container className="flex h-16 items-center">
           <Logo size="md" />

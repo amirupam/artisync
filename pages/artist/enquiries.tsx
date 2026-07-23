@@ -11,6 +11,7 @@ import Badge from "@/components/Badge";
 import EmptyState from "@/components/EmptyState";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useToast } from "@/components/Toast";
+import NoIndexMeta from "@/components/NoIndexMeta";
 
 const STATUS_BADGE: Record<string, "neutral" | "accent" | "success" | "warning" | "error"> = {
   new: "accent",
@@ -80,6 +81,7 @@ export default function ArtistEnquiriesPage() {
   if (loading || !userId) {
     return (
       <div className="min-h-screen bg-[var(--color-page)] flex items-center justify-center">
+        <NoIndexMeta />
         <LoadingSpinner size="lg" label="Loading" />
       </div>
     );
@@ -87,6 +89,7 @@ export default function ArtistEnquiriesPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-page)]">
+      <NoIndexMeta />
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <Container className="flex h-16 items-center justify-between">
           <Logo size="md" />

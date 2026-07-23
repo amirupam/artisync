@@ -5,8 +5,7 @@ import Button from "./Button";
 import Input from "./Input";
 import Select from "./Select";
 import Textarea from "./Textarea";
-
-const EVENT_TYPES = ["Wedding","Corporate Event","Birthday Party","Concert / Live Show","College Fest","Private Party","Festival","Cultural Program","Religious Event","Online / Virtual Event","Kids Event","Music Video / Album","Other"];
+import { EVENT_TYPES } from "@/lib/sharedConfig";
 
 export default function EnquiryModal({
   open,

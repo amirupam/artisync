@@ -1,0 +1,63 @@
+# ArtiSync — crawler access policy.
+# Public pages (homepage, artist discovery, category/city pages, published
+# artist profiles) are open to crawling. Authenticated/private areas
+# (dashboards, chat, enquiries, account, and internal APIs) are blocked here
+# AND separately marked noindex, and are additionally protected by
+# authentication and database-level authorization regardless of this file.
+
+User-agent: *
+Disallow: /dashboard
+Disallow: /create-profile
+Disallow: /profile-preview
+Disallow: /client-onboarding
+Disallow: /client-preferences
+Disallow: /saved-artists
+Disallow: /artist/enquiries
+Disallow: /client/
+Disallow: /conversation/
+Disallow: /reset-password
+Disallow: /auth/
+Disallow: /api/
+Allow: /api/public/
+Allow: /
+
+# OAI-SearchBot: powers ChatGPT's live search/browse feature. Allowed on all
+# public pages — this is the crawler most directly relevant to the "show up
+# when someone asks ChatGPT for an artist" goal.
+User-agent: OAI-SearchBot
+Disallow: /dashboard
+Disallow: /create-profile
+Disallow: /profile-preview
+Disallow: /client-onboarding
+Disallow: /client-preferences
+Disallow: /saved-artists
+Disallow: /artist/enquiries
+Disallow: /client/
+Disallow: /conversation/
+Disallow: /reset-password
+Disallow: /auth/
+Disallow: /api/
+Allow: /api/public/
+Allow: /
+
+# GPTBot: used to collect training data for OpenAI's models — a separate
+# purpose from search retrieval. Left allowed on public pages by default
+# since no training-data restriction was requested; disallow it site-wide
+# ("Disallow: /") instead if that policy is preferred.
+User-agent: GPTBot
+Disallow: /dashboard
+Disallow: /create-profile
+Disallow: /profile-preview
+Disallow: /client-onboarding
+Disallow: /client-preferences
+Disallow: /saved-artists
+Disallow: /artist/enquiries
+Disallow: /client/
+Disallow: /conversation/
+Disallow: /reset-password
+Disallow: /auth/
+Disallow: /api/
+Allow: /api/public/
+Allow: /
+
+Sitemap: https://www.artisync.in/sitemap.xml

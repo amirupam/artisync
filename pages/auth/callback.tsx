@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { resolveEntryPath, type EntryRole } from "@/lib/roleRouting";
 import { stripOAuthHashIfPresent } from "@/lib/stripOAuthHash";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import NoIndexMeta from "@/components/NoIndexMeta";
 
 /**
  * Landing point for OAuth sign-in (Google). Unlike email/password auth, an
@@ -45,6 +46,7 @@ export default function AuthCallbackPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--color-page)]">
+      <NoIndexMeta />
       <LoadingSpinner size="lg" label="Signing you in" />
     </div>
   );

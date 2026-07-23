@@ -5,6 +5,10 @@ const LINKS = [
   { label: "Find Artists", href: "/artists" },
   { label: "Join as an Artist", href: "/signup?role=artist" },
   { label: "Sign In", href: "/signup?role=artist" },
+  { label: "About", href: "/about" },
+  { label: "Contact", href: "/contact" },
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Terms", href: "/terms" },
 ];
 
 export default function Footer() {
