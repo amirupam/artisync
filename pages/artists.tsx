@@ -440,7 +440,7 @@ export default function ArtistsPage() {
             </span>
           </p>
         )}
-        {prefsChecked && clientId && !preferences && (
+        {prefsChecked && isClient && !preferences && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] bg-[var(--color-accent-soft)] px-4 py-3">
             <p className="text-sm text-[var(--color-accent-hover)] font-medium">Get better recommendations by telling us what you&rsquo;re looking for.</p>
             <Button href="/client-preferences" variant="primary" size="sm">Set preferences</Button>

@@ -43,6 +43,12 @@ function getYouTubeId(url: string): string | null {
   return m ? m[1] : null;
 }
 
+// Mirrors the server-side slug generation (schema_v9.sql) so the preview
+// shown while typing matches what will actually be saved.
+function slugifyUsername(raw: string): string {
+  return raw.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
 function MultiChip({ options, selected, onChange }: { options: string[]; selected: string[]; onChange: (v: string[]) => void }) {
   return (
     <div className="flex flex-wrap gap-2">
@@ -85,7 +91,7 @@ function FieldLabel({ children, optional }: { children: React.ReactNode; optiona
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type FormState = {
-  fullName: string; stageName: string; headline: string;
+  fullName: string; stageName: string; headline: string; username: string;
   profilePicture: File | null; profilePictureUrl: string;
   coverBanner: File | null; coverBannerUrl: string; coverBannerPositionY: number;
   artForm: string; artSubForms: string[]; skills: string[]; genres: string[]; instruments: string[]; groupType: string;
@@ -101,7 +107,7 @@ type FormState = {
 };
 
 const EMPTY_FORM: FormState = {
-  fullName: "", stageName: "", headline: "",
+  fullName: "", stageName: "", headline: "", username: "",
   profilePicture: null, profilePictureUrl: "",
   coverBanner: null, coverBannerUrl: "", coverBannerPositionY: 50,
   artForm: "", artSubForms: [], skills: [], genres: [], instruments: [], groupType: "",
@@ -145,6 +151,7 @@ export default function CreateProfilePage() {
   const [locating, setLocating] = useState(false);
   const [locationCaptured, setLocationCaptured] = useState(false);
   const [profilePhotoLightbox, setProfilePhotoLightbox] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const [coverDragOver, setCoverDragOver] = useState(false);
   const [profileDragOver, setProfileDragOver] = useState(false);
   const coverDragState = useRef<{ startY: number; startPos: number } | null>(null);
@@ -167,7 +174,7 @@ export default function CreateProfilePage() {
         if (d) {
           const loaded: FormState = {
             ...EMPTY_FORM,
-            fullName: d.full_name ?? "", stageName: d.stage_name ?? "", headline: d.headline ?? "",
+            fullName: d.full_name ?? "", stageName: d.stage_name ?? "", headline: d.headline ?? "", username: d.slug ?? "",
             profilePictureUrl: d.profile_picture_url ?? "", coverBannerUrl: d.cover_banner_url ?? "",
             coverBannerPositionY: typeof d.cover_banner_position_y === "number" ? d.cover_banner_position_y : 50,
             artForm: d.art_form ?? "", artSubForms: d.art_sub_forms ?? [], skills: d.skills ?? [], genres: d.genres ?? [], instruments: d.instruments ?? [], groupType: d.group_type ?? "",
@@ -252,6 +259,22 @@ export default function CreateProfilePage() {
       router.events.off("routeChangeStart", onRouteChangeStart);
     };
   }, [dirty, router.events]);
+
+  // ── Check whether the chosen username/slug is available ───────────────────
+  useEffect(() => {
+    const candidate = slugifyUsername(form.username);
+    if (!candidate) { setUsernameStatus("idle"); return; }
+    setUsernameStatus("checking");
+    const t = setTimeout(async () => {
+      const [{ data: liveMatch }, { data: historyMatch }] = await Promise.all([
+        supabase.from("artists_public").select("id").eq("slug", candidate).maybeSingle(),
+        supabase.from("artist_slug_history").select("artist_id").eq("slug", candidate).maybeSingle(),
+      ]);
+      const takenByOther = (!!liveMatch && liveMatch.id !== userId) || (!!historyMatch && historyMatch.artist_id !== userId);
+      setUsernameStatus(takenByOther ? "taken" : "available");
+    }, 500);
+    return () => clearTimeout(t);
+  }, [form.username, userId]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -359,7 +382,7 @@ export default function CreateProfilePage() {
 
       const { error: dbError } = await supabase.from("artists").upsert({
         id: userId,
-        full_name: form.fullName, stage_name: form.stageName, headline: form.headline,
+        full_name: form.fullName, stage_name: form.stageName, headline: form.headline, slug: slugifyUsername(form.username),
         profile_picture_url: profilePictureUrl, cover_banner_url: coverBannerUrl, cover_banner_position_y: form.coverBannerPositionY,
         art_form: form.artForm, art_sub_forms: form.artSubForms, skills: form.skills, genres: form.genres, instruments: form.instruments, group_type: form.groupType,
         bio: form.bio,
@@ -562,6 +585,30 @@ export default function CreateProfilePage() {
 
               <Input label="Artist name" required value={form.fullName} onChange={(e) => update("fullName", e.target.value)} error={stepErrors.fullName} />
               <Input label="Stage name" optional hint="If different from your artist name." value={form.stageName} onChange={(e) => update("stageName", e.target.value)} />
+
+              <div>
+                <Input
+                  label="Username"
+                  optional
+                  placeholder="yourname"
+                  value={form.username}
+                  onChange={(e) => update("username", e.target.value)}
+                />
+                <p className="mt-1.5 text-xs text-[var(--color-text-secondary)]">
+                  Your public profile will be at{" "}
+                  <span className="font-medium text-[var(--color-text)]">artisync.in/artists/{slugifyUsername(form.username) || "…"}</span>
+                </p>
+                {usernameStatus === "checking" && (
+                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">Checking availability…</p>
+                )}
+                {usernameStatus === "taken" && (
+                  <p className="mt-1 text-xs text-[var(--color-error)]">This username is already taken — please choose another.</p>
+                )}
+                {usernameStatus === "available" && (
+                  <p className="mt-1 text-xs text-[var(--color-success)]">✓ Available</p>
+                )}
+              </div>
+
               <Input label="Professional headline" hint='e.g. "Bollywood playback singer for weddings & events"' value={form.headline} onChange={(e) => update("headline", e.target.value)} />
 
               <Textarea
