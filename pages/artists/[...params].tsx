@@ -14,7 +14,7 @@ import Logo from "@/components/Logo";
 import Card from "@/components/Card";
 import EmptyState from "@/components/EmptyState";
 import SaveArtistButton from "@/components/SaveArtistButton";
-import EnquiryModal from "@/components/EnquiryModal";
+import { useChat } from "@/components/ChatContext";
 import { useToast } from "@/components/Toast";
 import { generateArtistSummary } from "@/lib/artistSummary";
 import { buildArtistTitle, buildArtistDescription, buildListingTitle, buildListingDescription, LISTING_INDEX_THRESHOLD } from "@/lib/seoMeta";
@@ -184,8 +184,10 @@ export const getStaticProps: GetStaticProps<PageProps> = async ({ params }) => {
 function ArtistProfileView({ profile }: { profile: ArtistProfile }) {
   const router = useRouter();
   const { showToast } = useToast();
+  const { openConversationWithArtist } = useChat();
   const [userId, setUserId] = useState<string | null>(null);
-  const [enquiryOpen, setEnquiryOpen] = useState(false);
+  const [messaging, setMessaging] = useState(false);
+  const isOwnProfile = !!userId && userId === profile.id;
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -194,12 +196,20 @@ function ArtistProfileView({ profile }: { profile: ArtistProfile }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  function handleContactClick() {
+  async function handleContactClick() {
     if (!userId) {
       router.push({ pathname: "/signup", query: { role: "client", returnTo: router.asPath } });
       return;
     }
-    setEnquiryOpen(true);
+    if (isOwnProfile) return;
+    setMessaging(true);
+    try {
+      await openConversationWithArtist(profile.id);
+    } catch {
+      showToast("Could not start the conversation. Please try again.", "error");
+    } finally {
+      setMessaging(false);
+    }
   }
 
   async function handleShare() {
@@ -248,10 +258,6 @@ function ArtistProfileView({ profile }: { profile: ArtistProfile }) {
         {profile.profilePictureUrl && <meta name="twitter:image" content={profile.profilePictureUrl} />}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       </Head>
-
-      {userId && (
-        <EnquiryModal open={enquiryOpen} onClose={() => setEnquiryOpen(false)} artistId={profile.id} clientId={userId} />
-      )}
 
       {/* ── Navbar ── */}
       <div className="sticky top-0 z-40 flex items-center justify-between px-5 h-14 bg-[var(--color-primary)]/90 backdrop-blur-md">
@@ -341,8 +347,12 @@ function ArtistProfileView({ profile }: { profile: ArtistProfile }) {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" /></svg>
               Share
             </button>
-            <SaveArtistButton artistId={profile.id} clientId={userId} />
-            <Button type="button" variant="primary" size="md" onClick={handleContactClick}>Contact Artist</Button>
+            {!isOwnProfile && (
+              <>
+                <SaveArtistButton artistId={profile.id} clientId={userId} />
+                <Button type="button" variant="primary" size="md" onClick={handleContactClick} disabled={messaging}>Message</Button>
+              </>
+            )}
           </div>
         </div>
       </Container>
@@ -408,12 +418,16 @@ function ArtistProfileView({ profile }: { profile: ArtistProfile }) {
                 {profile.priceRange ? `₹${profile.priceRange}` : "Contact for price"}
               </p>
               {profile.pricingUnit && <p className="text-sm text-[var(--color-text-secondary)]">{profile.pricingUnit}{profile.priceNegotiable ? " · Negotiable" : ""}</p>}
-              <Button type="button" variant="primary" size="lg" fullWidth className="mt-5" onClick={handleContactClick}>
-                Contact Artist
-              </Button>
-              <div className="mt-3">
-                <SaveArtistButton artistId={profile.id} clientId={userId} className="w-full justify-center" />
-              </div>
+              {!isOwnProfile && (
+                <>
+                  <Button type="button" variant="primary" size="lg" fullWidth className="mt-5" onClick={handleContactClick} disabled={messaging}>
+                    Message
+                  </Button>
+                  <div className="mt-3">
+                    <SaveArtistButton artistId={profile.id} clientId={userId} className="w-full justify-center" />
+                  </div>
+                </>
+              )}
 
               <dl className="mt-6 space-y-3 text-sm border-t border-[var(--color-border)] pt-5">
                 {profile.experience && (
@@ -435,13 +449,15 @@ function ArtistProfileView({ profile }: { profile: ArtistProfile }) {
       </Container>
 
       {/* ── Mobile sticky contact bar ── */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 flex items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-base font-bold text-[var(--color-text)] truncate">{profile.priceRange ? `₹${profile.priceRange}` : "Contact for price"}</p>
+      {!isOwnProfile && (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-bold text-[var(--color-text)] truncate">{profile.priceRange ? `₹${profile.priceRange}` : "Contact for price"}</p>
+          </div>
+          <SaveArtistButton artistId={profile.id} clientId={userId} className="!px-3" />
+          <Button type="button" variant="primary" size="md" onClick={handleContactClick} disabled={messaging}>Message</Button>
         </div>
-        <SaveArtistButton artistId={profile.id} clientId={userId} className="!px-3" />
-        <Button type="button" variant="primary" size="md" onClick={handleContactClick}>Contact</Button>
-      </div>
+      )}
     </div>
   );
 }

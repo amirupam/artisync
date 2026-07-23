@@ -1,6 +1,6 @@
 // Shared configuration values used across the artist profile wizard
-// (create-profile.tsx), the enquiry form (EnquiryModal.tsx), the
-// client-preferences wizard, and the artist-discovery page — one canonical
+// (create-profile.tsx), the client-preferences wizard, and the
+// artist-discovery page — one canonical
 // vocabulary so category/event-type/language matching (lib/artistMatch.ts)
 // compares like with like instead of silently failing on wording
 // differences (e.g. "Anchor / Emcee" vs "Anchor or Emcee").

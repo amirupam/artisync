@@ -39,11 +39,38 @@ export default function SignupPage() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotStatus, setForgotStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [forgotError, setForgotError] = useState<string | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  // If the visitor is already signed in — e.g. they hit Back or reloaded
+  // after logging in — send them straight to where they belong instead of
+  // showing the login form again, which looks like they got signed out.
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (cancelled) return;
+      if (!session?.user) { setCheckingSession(false); return; }
+      const destination = await resolveEntryPath(session.user.id, role);
+      const returnTo = typeof router.query.returnTo === "string" ? router.query.returnTo : undefined;
+      if (returnTo && destination === "/artists") {
+        router.replace(returnTo);
+      } else if (returnTo && (destination === "/client-onboarding" || destination === "/client-preferences")) {
+        router.replace({ pathname: destination, query: { returnTo } });
+      } else {
+        router.replace(destination);
+      }
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setError(null);
     setFieldErrors({});
   }, [mode]);
+
+  if (checkingSession) {
+    return <div className="min-h-screen" />;
+  }
 
   function validate(): boolean {
     const next: typeof fieldErrors = {};

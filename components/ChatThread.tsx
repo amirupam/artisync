@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useRouter } from "next/router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { stripOAuthHashIfPresent } from "@/lib/stripOAuthHash";
-import { looksLikeContactLeak, type ConversationRow, type MessageRow, type ContactShareRequestRow } from "@/lib/conversations";
-import Container from "@/components/Container";
-import Logo from "@/components/Logo";
+import {
+  looksLikeContactLeak,
+  markConversationRead,
+  type ConversationRow,
+  type MessageRow,
+  type ContactShareRequestRow,
+} from "@/lib/conversations";
+import { useChat } from "@/components/ChatContext";
 import Button from "@/components/Button";
 import Textarea from "@/components/Textarea";
 import Input from "@/components/Input";
@@ -12,17 +15,26 @@ import Modal from "@/components/Modal";
 import Badge from "@/components/Badge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useToast } from "@/components/Toast";
-import NoIndexMeta from "@/components/NoIndexMeta";
 
 const CHAT_BUCKET = "chat-attachments";
 
 type Partner = { user_id: string; display_name: string; profile_picture_url: string };
 type ContactInfo = { phone: string; email: string; website: string; preferred_contact_method: string };
 
-export default function ConversationPage() {
-  const router = useRouter();
+/** Shared message-thread UI — used both by the full-page /conversation/[id] route and the ChatWidget panel. */
+export default function ChatThread({
+  conversationId,
+  userId,
+  compact = false,
+  onBack,
+}: {
+  conversationId: string;
+  userId: string;
+  compact?: boolean;
+  onBack?: () => void;
+}) {
   const { showToast } = useToast();
-  const [userId, setUserId] = useState<string | null>(null);
+  const { refreshConversations } = useChat();
   const [conversation, setConversation] = useState<ConversationRow | null>(null);
   const [partner, setPartner] = useState<Partner | null>(null);
   const [messages, setMessages] = useState<MessageRow[]>([]);
@@ -38,13 +50,14 @@ export default function ConversationPage() {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const loadShareState = useCallback(async (conversationId: string, uid: string) => {
+  const loadShareState = useCallback(async (convId: string, uid: string) => {
     const { data: requests } = await supabase
       .from("contact_share_requests")
       .select("*")
-      .eq("conversation_id", conversationId)
+      .eq("conversation_id", convId)
       .order("created_at", { ascending: false });
     setShareRequests((requests as ContactShareRequestRow[]) ?? []);
 
@@ -63,17 +76,11 @@ export default function ConversationPage() {
   useEffect(() => {
     let cancelled = false;
 
-    async function handleUser(u: { id: string } | null | undefined) {
-      if (cancelled) return;
-      if (!u) { router.replace("/signup"); return; }
-      stripOAuthHashIfPresent();
-      if (!router.isReady) return;
-      const enquiryId = router.query.enquiryId as string;
-      if (!enquiryId) return;
+    async function load() {
+      setLoading(true);
+      setNotFound(false);
 
-      setUserId(u.id);
-
-      const { data: conv } = await supabase.from("conversations").select("*").eq("enquiry_id", enquiryId).maybeSingle();
+      const { data: conv } = await supabase.from("conversations").select("*").eq("id", conversationId).maybeSingle();
       if (cancelled) return;
       if (!conv) { setNotFound(true); setLoading(false); return; }
       setConversation(conv as ConversationRow);
@@ -91,18 +98,15 @@ export default function ConversationPage() {
       if (cancelled) return;
       setMessages((msgs as MessageRow[]) ?? []);
 
-      await loadShareState(conv.id, u.id);
+      await loadShareState(conv.id, userId);
       if (cancelled) return;
+      await markConversationRead(conv.id);
       setLoading(false);
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => handleUser(session?.user));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "INITIAL_SESSION") return;
-      handleUser(session?.user);
-    });
-    return () => { cancelled = true; subscription.unsubscribe(); };
-  }, [router, router.isReady, router.query.enquiryId, loadShareState]);
+    load();
+    return () => { cancelled = true; };
+  }, [conversationId, userId, loadShareState]);
 
   // Realtime: new messages and conversation status changes (e.g. blocked).
   useEffect(() => {
@@ -110,14 +114,19 @@ export default function ConversationPage() {
     const channel = supabase
       .channel(`conversation-${conversation.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversation.id}` },
-        (payload) => setMessages((prev) => [...prev, payload.new as MessageRow]))
+        (payload) => {
+          const incoming = payload.new as MessageRow;
+          setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]));
+          markConversationRead(conversation.id);
+          refreshConversations();
+        })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations", filter: `id=eq.${conversation.id}` },
         (payload) => setConversation(payload.new as ConversationRow))
       .on("postgres_changes", { event: "*", schema: "public", table: "contact_share_requests", filter: `conversation_id=eq.${conversation.id}` },
-        () => { if (userId) loadShareState(conversation.id, userId); })
+        () => loadShareState(conversation.id, userId))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [conversation, userId, loadShareState]);
+  }, [conversation, userId, loadShareState, refreshConversations]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -140,7 +149,7 @@ export default function ConversationPage() {
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    if (!conversation || !userId) return;
+    if (!conversation) return;
     if (!body.trim() && !file) return;
     if (file && file.size > 10 * 1024 * 1024) {
       showToast("Attachments must be 10MB or smaller.", "error");
@@ -157,16 +166,26 @@ export default function ConversationPage() {
         attachmentPath = path;
         attachmentType = file.type || "application/octet-stream";
       }
-      const { error } = await supabase.from("messages").insert({
-        conversation_id: conversation.id,
-        sender_id: userId,
-        body: body.trim(),
-        attachment_url: attachmentPath,
-        attachment_type: attachmentType,
-      });
+      const { data: inserted, error } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: conversation.id,
+          sender_id: userId,
+          body: body.trim(),
+          attachment_url: attachmentPath,
+          attachment_type: attachmentType,
+        })
+        .select()
+        .single();
       if (error) throw error;
+      // Show it immediately rather than waiting on the realtime echo — the
+      // realtime listener below dedupes by id so this never double-adds.
+      if (inserted) {
+        setMessages((prev) => (prev.some((m) => m.id === inserted.id) ? prev : [...prev, inserted as MessageRow]));
+      }
       setBody("");
       setFile(null);
+      refreshConversations();
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : "Could not send message", "error");
     } finally {
@@ -175,7 +194,7 @@ export default function ConversationPage() {
   }
 
   async function requestContactShare() {
-    if (!conversation || !userId || !partner) return;
+    if (!conversation || !partner) return;
     const { error } = await supabase.from("contact_share_requests").insert({
       conversation_id: conversation.id,
       requested_by: userId,
@@ -188,18 +207,18 @@ export default function ConversationPage() {
   async function respondToShareRequest(id: string, status: "approved" | "declined") {
     const { error } = await supabase.from("contact_share_requests").update({ status }).eq("id", id);
     if (error) showToast(error.message, "error");
-    else if (conversation && userId) loadShareState(conversation.id, userId);
+    else if (conversation) loadShareState(conversation.id, userId);
   }
 
   async function handleBlock() {
-    if (!conversation || !userId) return;
+    if (!conversation) return;
     const { error } = await supabase.from("conversation_blocks").insert({ conversation_id: conversation.id, blocked_by: userId });
     if (error) showToast(error.message, "error");
     else { showToast("Conversation blocked.", "success"); setBlockOpen(false); }
   }
 
   async function handleReport() {
-    if (!conversation || !userId || !partner || !reportReason.trim()) return;
+    if (!conversation || !partner || !reportReason.trim()) return;
     const { error } = await supabase.from("reports").insert({
       conversation_id: conversation.id,
       reported_by: userId,
@@ -212,27 +231,26 @@ export default function ConversationPage() {
   }
 
   async function closeConversation() {
-    if (!conversation || !userId) return;
+    if (!conversation) return;
     const isArtist = conversation.artist_id === userId;
     const { error } = await supabase
       .from("conversations")
       .update({ status: isArtist ? "closed_by_artist" : "closed_by_client" })
       .eq("id", conversation.id);
     if (error) showToast(error.message, "error");
+    setMenuOpen(false);
   }
 
   if (loading) {
-    return <div className="min-h-screen bg-[var(--color-page)] flex items-center justify-center"><NoIndexMeta /><LoadingSpinner size="lg" label="Loading" /></div>;
+    return <div className={`flex items-center justify-center ${compact ? "h-full" : "min-h-screen bg-[var(--color-page)]"}`}><LoadingSpinner size={compact ? "md" : "lg"} label="Loading" /></div>;
   }
 
   if (notFound || !conversation) {
     return (
-      <div className="min-h-screen bg-[var(--color-page)] flex items-center justify-center px-4">
-        <NoIndexMeta />
-        <div className="text-center">
-          <p className="text-lg font-semibold text-[var(--color-text)]">This conversation isn&apos;t available.</p>
-          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">It may not have opened yet, or you may not have access to it.</p>
-          <Button href="/" variant="primary" size="sm" className="mt-6">Back to home</Button>
+      <div className={`flex items-center justify-center px-4 text-center ${compact ? "h-full" : "min-h-screen bg-[var(--color-page)]"}`}>
+        <div>
+          <p className="text-sm font-semibold text-[var(--color-text)]">This conversation isn&apos;t available.</p>
+          <p className="mt-2 text-xs text-[var(--color-text-secondary)]">It may not have opened yet, or you may not have access to it.</p>
         </div>
       </div>
     );
@@ -244,48 +262,67 @@ export default function ConversationPage() {
   const myOutgoingPending = shareRequests.some((r) => r.requested_by === userId && r.status === "pending");
 
   return (
-    <div className="min-h-screen bg-[var(--color-page)] flex flex-col">
-      <NoIndexMeta />
-      <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-        <Container className="flex flex-wrap gap-y-2 min-h-16 items-center justify-between py-2">
-          <div className="flex items-center gap-3 min-w-0">
-            <Logo size="sm" />
-            <span className="text-[var(--color-border)]" aria-hidden="true">/</span>
-            <span className="font-semibold text-[var(--color-text)] truncate max-w-[40vw] sm:max-w-none">{partner?.display_name || "Conversation"}</span>
+    <div className={compact ? "flex flex-col h-full" : "min-h-screen bg-[var(--color-page)] flex flex-col"}>
+      {/* Header */}
+      <div className={compact
+        ? "flex items-center justify-between gap-2 px-3 py-2.5 border-b border-[var(--color-border)] flex-shrink-0"
+        : "border-b border-[var(--color-border)] bg-[var(--color-surface)]"
+      }>
+        <div className={compact ? "flex items-center gap-2 min-w-0" : "max-w-3xl mx-auto flex flex-wrap gap-y-2 min-h-16 items-center justify-between py-2 px-4"}>
+          <div className="flex items-center gap-2 min-w-0">
+            {onBack && (
+              <button type="button" onClick={onBack} aria-label="Back to conversations" className="flex-shrink-0 text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              </button>
+            )}
+            {partner?.profile_picture_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={partner.profile_picture_url} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-[var(--color-primary-soft)] flex-shrink-0" />
+            )}
+            <span className="font-semibold text-sm text-[var(--color-text)] truncate">{partner?.display_name || "Conversation"}</span>
             {!isActive && <Badge variant={isBlocked ? "error" : "neutral"}>{isBlocked ? "Blocked" : "Closed"}</Badge>}
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {isActive && <Button size="sm" variant="ghost" onClick={closeConversation}>Close</Button>}
-            <Button size="sm" variant="ghost" onClick={() => setReportOpen(true)}>Report</Button>
-            {isActive && <Button size="sm" variant="ghost" onClick={() => setBlockOpen(true)}>Block</Button>}
+          <div className="relative flex-shrink-0">
+            <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-label="Conversation options" className="p-1.5 rounded-[var(--radius-md)] text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-soft)]">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zm0 6a.75.75 0 110-1.5.75.75 0 010 1.5zm0 6a.75.75 0 110-1.5.75.75 0 010 1.5z" /></svg>
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-1 w-40 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-md)] z-10 py-1">
+                {isActive && <button type="button" onClick={closeConversation} className="w-full text-left px-3 py-2 text-xs text-[var(--color-text)] hover:bg-[var(--color-primary-soft)]">Close conversation</button>}
+                {isActive && <button type="button" onClick={() => { setBlockOpen(true); setMenuOpen(false); }} className="w-full text-left px-3 py-2 text-xs text-[var(--color-text)] hover:bg-[var(--color-primary-soft)]">Block</button>}
+                <button type="button" onClick={() => { setReportOpen(true); setMenuOpen(false); }} className="w-full text-left px-3 py-2 text-xs text-[var(--color-text)] hover:bg-[var(--color-primary-soft)]">Report</button>
+              </div>
+            )}
           </div>
-        </Container>
-      </header>
+        </div>
+      </div>
 
-      <Container className="flex-1 flex flex-col py-6 max-w-3xl">
+      <div className={compact ? "flex-1 flex flex-col min-h-0" : "flex-1 flex flex-col py-6 max-w-3xl mx-auto w-full px-4"}>
         {/* Contact sharing panel */}
-        <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <div className={compact ? "px-3 py-2 border-b border-[var(--color-border)] flex-shrink-0" : "mb-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4"}>
           {contactInfo ? (
             <div>
-              <p className="text-sm font-semibold text-[var(--color-text)]">Contact details shared</p>
-              <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+              <p className={compact ? "text-xs font-semibold text-[var(--color-text)]" : "text-sm font-semibold text-[var(--color-text)]"}>Contact details shared</p>
+              <p className={compact ? "text-xs text-[var(--color-text-secondary)] mt-0.5" : "text-sm text-[var(--color-text-secondary)] mt-1"}>
                 {[contactInfo.phone, contactInfo.email, contactInfo.website].filter(Boolean).join(" · ") || "No contact details on file."}
               </p>
             </div>
           ) : myPendingIncoming.length > 0 ? (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-[var(--color-text)]">{partner?.display_name || "They"} would like to see your contact details.</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-[var(--color-text)]">{partner?.display_name || "They"} would like your contact details.</p>
               <div className="flex gap-2">
                 <Button size="sm" variant="primary" onClick={() => respondToShareRequest(myPendingIncoming[0].id, "approved")}>Approve</Button>
                 <Button size="sm" variant="outline" onClick={() => respondToShareRequest(myPendingIncoming[0].id, "declined")}>Decline</Button>
               </div>
             </div>
           ) : (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-[var(--color-text-secondary)]">Contact details stay private until both sides agree to share.</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-[var(--color-text-secondary)]">Contact details stay private until both sides agree.</p>
               {isActive && (
                 <Button size="sm" variant="outline" disabled={myOutgoingPending} onClick={requestContactShare}>
-                  {myOutgoingPending ? "Request sent" : "Request contact info"}
+                  {myOutgoingPending ? "Requested" : "Request contact info"}
                 </Button>
               )}
             </div>
@@ -298,14 +335,14 @@ export default function ConversationPage() {
           role="log"
           aria-live="polite"
           aria-label="Conversation messages"
-          className="flex-1 overflow-y-auto space-y-3 pr-1"
-          style={{ maxHeight: "55vh" }}
+          className={compact ? "flex-1 overflow-y-auto space-y-2.5 px-3 py-3 min-h-0" : "flex-1 overflow-y-auto space-y-3 pr-1"}
+          style={compact ? undefined : { maxHeight: "55vh" }}
         >
           {messages.map((m) => {
             const mine = m.sender_id === userId;
             return (
               <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] sm:max-w-[75%] rounded-[var(--radius-lg)] px-4 py-2.5 ${mine ? "bg-[var(--color-primary)] text-white" : "bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)]"}`}>
+                <div className={`max-w-[85%] ${compact ? "" : "sm:max-w-[75%]"} rounded-[var(--radius-lg)] px-3.5 py-2 ${mine ? "bg-[var(--color-primary)] text-white" : "bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)]"}`}>
                   <span className="sr-only">{mine ? "You" : partner?.display_name || "They"} said, at {new Date(m.created_at).toLocaleString()}:</span>
                   {m.body && <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>}
                   {m.attachment_url && (
@@ -322,7 +359,7 @@ export default function ConversationPage() {
                   )}
                   {m.flagged_contact_leak && (
                     <p className={`mt-2 text-xs ${mine ? "text-white/80" : "text-[var(--color-warning)]"}`}>
-                      <span aria-hidden="true">⚠ </span>This message may contain contact details. Sharing contact info happens through mutual consent above, not chat.
+                      <span aria-hidden="true">⚠ </span>May contain contact details — use contact-sharing above instead.
                     </p>
                   )}
                   <p className={`mt-1 text-[10px] ${mine ? "text-white/60" : "text-[var(--color-text-secondary)]"}`} aria-hidden="true">
@@ -339,18 +376,18 @@ export default function ConversationPage() {
 
         {/* Composer */}
         {isActive ? (
-          <form onSubmit={handleSend} className="mt-4 flex items-end gap-3">
-            <div className="flex-1">
+          <form onSubmit={handleSend} className={compact ? "flex items-end gap-2 px-3 py-2.5 border-t border-[var(--color-border)] flex-shrink-0" : "mt-4 flex items-end gap-3"}>
+            <div className="flex-1 min-w-0">
               <Textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                rows={2}
+                rows={compact ? 1 : 2}
                 placeholder="Type a message…"
                 aria-label="Message"
               />
               {body && looksLikeContactLeak(body) && (
                 <p className="mt-1 text-xs text-[var(--color-warning)]" role="status">
-                  <span aria-hidden="true">⚠ </span>This looks like it contains a phone number or email — use the contact-sharing request instead.
+                  <span aria-hidden="true">⚠ </span>Looks like a phone number or email — use contact-sharing instead.
                 </p>
               )}
               {file && (
@@ -361,7 +398,7 @@ export default function ConversationPage() {
               )}
             </div>
             <label
-              className="cursor-pointer rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-soft)]
+              className="cursor-pointer rounded-[var(--radius-md)] border border-[var(--color-border)] p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-soft)] flex-shrink-0
                 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--color-accent)]"
             >
               <span className="sr-only">Attach a file</span>
@@ -372,16 +409,16 @@ export default function ConversationPage() {
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 aria-label="Attach a file"
               />
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01" /></svg>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01" /></svg>
             </label>
-            <Button type="submit" variant="primary" disabled={sending || (!body.trim() && !file)}>Send</Button>
+            <Button type="submit" variant="primary" size={compact ? "sm" : "md"} disabled={sending || (!body.trim() && !file)}>Send</Button>
           </form>
         ) : (
-          <p className="mt-4 text-center text-sm text-[var(--color-text-secondary)] py-3">
-            {isBlocked ? "This conversation has been blocked and can no longer receive messages." : "This conversation is closed."}
+          <p className="text-center text-xs text-[var(--color-text-secondary)] py-3 px-3">
+            {isBlocked ? "This conversation has been blocked." : "This conversation is closed."}
           </p>
         )}
-      </Container>
+      </div>
 
       <Modal open={blockOpen} onClose={() => setBlockOpen(false)} title="Block this conversation?">
         <p className="text-sm text-[var(--color-text-secondary)]">Neither of you will be able to send new messages. This can&apos;t be undone.</p>

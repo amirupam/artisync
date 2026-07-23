@@ -3,6 +3,8 @@ import type { AppProps } from "next/app";
 import Head from "next/head";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { ToastProvider } from "@/components/Toast";
+import { ChatProvider } from "@/components/ChatContext";
+import ChatWidget from "@/components/ChatWidget";
 
 const body = Inter({
   subsets: ["latin"],
@@ -28,7 +30,10 @@ export default function App({ Component, pageProps }: AppProps) {
       </Head>
       <main className={`${body.variable} ${heading.variable}`}>
         <ToastProvider>
-          <Component {...pageProps} />
+          <ChatProvider>
+            <Component {...pageProps} />
+            <ChatWidget />
+          </ChatProvider>
         </ToastProvider>
       </main>
     </>

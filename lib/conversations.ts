@@ -47,27 +47,35 @@ export type ContactShareRequestRow = {
   responded_at: string | null;
 };
 
-const STATUS_LABELS: Record<EnquiryStatus, string> = {
-  new: "New",
-  interested: "Interested",
-  needs_details: "Needs more details",
-  not_available: "Not available",
-  closed: "Closed",
-};
-
-export function enquiryStatusLabel(status: string): string {
-  return STATUS_LABELS[status as EnquiryStatus] ?? status;
-}
-
-/** Fetches (or lazily reads) the conversation created for an accepted enquiry. */
-export async function getConversationForEnquiry(enquiryId: string) {
-  return supabase.from("conversations").select("*").eq("enquiry_id", enquiryId).maybeSingle();
-}
-
 /** True if a phone number or email address appears in free text — used to warn, never to block or alter messages. */
 const PHONE_PATTERN = /(?:\+?\d[\s.-]?){9,}/;
 const EMAIL_PATTERN = /[a-z0-9._%+-]+\s*(?:@|\(at\)|\[at\])\s*[a-z0-9.-]+\s*(?:\.|\(dot\)|\[dot\])\s*[a-z]{2,}/i;
 
 export function looksLikeContactLeak(text: string): boolean {
   return PHONE_PATTERN.test(text) || EMAIL_PATTERN.test(text);
+}
+
+export type ConversationSummary = {
+  conversation_id: string;
+  partner_id: string;
+  partner_name: string;
+  partner_photo: string;
+  status: ConversationStatus;
+  last_message_body: string | null;
+  last_message_at: string;
+  unread_count: number;
+};
+
+/** Get-or-create a direct conversation with an artist — no enquiry/accept step. */
+export async function startConversation(artistId: string) {
+  return supabase.rpc("start_conversation", { p_artist_id: artistId }).single();
+}
+
+/** Fetches every conversation the current user is part of, with partner info, last message, and unread count — powers the chat bar. */
+export async function listMyConversations() {
+  return supabase.rpc("list_my_conversations");
+}
+
+export async function markConversationRead(conversationId: string) {
+  return supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
 }
