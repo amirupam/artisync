@@ -1,4 +1,6 @@
 import type { NextPage } from "next";
+import { useEffect } from "react";
+import { useRouter } from "next/router";
 import Link from "next/link";
 import Container from "@/components/Container";
 import Button from "@/components/Button";
@@ -8,6 +10,8 @@ import AppHeader from "@/components/AppHeader";
 import Footer from "@/components/Footer";
 import { ARTIST_CATEGORIES } from "@/lib/sharedConfig";
 import { slugify } from "@/lib/slugify";
+import { supabase } from "@/lib/supabaseClient";
+import { resolveEntryPath } from "@/lib/roleRouting";
 
 const BENEFITS = [
   {
@@ -55,6 +59,20 @@ const ARTIST_STEPS = [
 ];
 
 const Home: NextPage = () => {
+  const router = useRouter();
+
+  // Signed-in visitors land on their own home (dashboard for artists,
+  // discovery for clients) instead of the marketing landing page.
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (cancelled || !session?.user) return;
+      const destination = await resolveEntryPath(session.user.id, "artist");
+      if (!cancelled) router.replace(destination);
+    });
+    return () => { cancelled = true; };
+  }, [router]);
+
   return (
     <div className="min-h-screen bg-[var(--color-page)]">
       <AppHeader />

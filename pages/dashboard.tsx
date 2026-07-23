@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { supabase, mapArtistRow, type ArtistProfile } from "@/lib/supabaseClient";
 import { getArtistProfileCompleteness } from "@/lib/artistProfileCompleteness";
 import { stripOAuthHashIfPresent } from "@/lib/stripOAuthHash";
-import { listOpenJobs, listMyApplications, applyToJob, uploadApplicationAttachment, formatBudget, formatJobLocation, type JobRow, type ApplicationStatus } from "@/lib/jobs";
+import { listOpenJobs, listMyApplications, applyToJob, uploadApplicationAttachment, formatBudget, formatJobLocation, type OpenJobListing, type ApplicationStatus } from "@/lib/jobs";
 import Container from "@/components/Container";
 import Card from "@/components/Card";
 import Button from "@/components/Button";
@@ -17,6 +17,7 @@ import Textarea from "@/components/Textarea";
 import NoIndexMeta from "@/components/NoIndexMeta";
 import { useChat } from "@/components/ChatContext";
 import { useToast } from "@/components/Toast";
+import ArtistNav from "@/components/ArtistNav";
 
 function uniqueSorted(values: (string | undefined | null)[]): string[] {
   return Array.from(new Set(values.filter((v): v is string => !!v && v.trim().length > 0))).sort();
@@ -43,9 +44,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [togglingStatus, setTogglingStatus] = useState(false);
 
-  const [jobs, setJobs] = useState<JobRow[] | null>(null);
+  const [jobs, setJobs] = useState<OpenJobListing[] | null>(null);
   const [applications, setApplications] = useState<Record<string, ApplicationStatus>>({});
-  const [applyJob, setApplyJob] = useState<JobRow | null>(null);
+  const [applyJob, setApplyJob] = useState<OpenJobListing | null>(null);
   const [applyMessage, setApplyMessage] = useState("");
   const [applyRate, setApplyRate] = useState("");
   const [applyLinks, setApplyLinks] = useState("");
@@ -59,7 +60,7 @@ export default function DashboardPage() {
 
   const loadJobs = useCallback(async (artistId: string) => {
     const [{ data: openJobs }, { data: myApps }] = await Promise.all([listOpenJobs(), listMyApplications(artistId)]);
-    setJobs((openJobs as JobRow[]) ?? []);
+    setJobs((openJobs as OpenJobListing[]) ?? []);
     setApplications(Object.fromEntries(((myApps as { job_id: string; status: ApplicationStatus }[]) ?? []).map((a) => [a.job_id, a.status])));
   }, []);
 
@@ -187,6 +188,7 @@ export default function DashboardPage() {
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <Container className="flex h-16 items-center justify-between">
           <Logo size="md" />
+          <ArtistNav active="dashboard" />
         </Container>
       </header>
 
@@ -243,6 +245,7 @@ export default function DashboardPage() {
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
                             <p className="font-semibold text-[var(--color-text)]">{job.title}</p>
+                            <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">Posted by {job.client_name}</p>
                             <p className="text-sm text-[var(--color-text-secondary)] mt-0.5">
                               {job.art_form}{job.event_type ? ` · ${job.event_type}` : ""} · {formatJobLocation(job)}
                             </p>
@@ -263,32 +266,6 @@ export default function DashboardPage() {
                       </Card>
                     );
                   })}
-                </div>
-              )}
-            </div>
-
-            {/* Portfolio preview */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-semibold text-[var(--color-text)]">Portfolio</h2>
-                <Button href="/create-profile?step=3" variant="ghost" size="sm">Edit</Button>
-              </div>
-              {profile.performanceImageUrls.length === 0 ? (
-                <Card className="p-6">
-                  <EmptyState
-                    title="No portfolio media yet"
-                    description="Add photos or videos so clients can see your work."
-                    action={<Button href="/create-profile?step=3" variant="primary" size="sm">Add Portfolio</Button>}
-                  />
-                </Card>
-              ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                  {profile.performanceImageUrls.slice(0, 8).map((url) => (
-                    <div key={url} className="aspect-square rounded-[var(--radius-md)] overflow-hidden bg-[var(--color-primary-soft)]">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="" className="w-full h-full object-cover" />
-                    </div>
-                  ))}
                 </div>
               )}
             </div>
@@ -373,7 +350,7 @@ export default function DashboardPage() {
         {applyJob && (
           <form onSubmit={submitApplication} className="space-y-4">
             <p className="text-sm text-[var(--color-text-secondary)]">
-              {formatBudget(applyJob)} · {formatJobLocation(applyJob)}
+              Posted by {applyJob.client_name} · {formatBudget(applyJob)} · {formatJobLocation(applyJob)}
             </p>
             <Input
               label="Your rate"

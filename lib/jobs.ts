@@ -21,6 +21,8 @@ export type JobRow = {
   updated_at: string;
 };
 
+export type OpenJobListing = JobRow & { client_name: string };
+
 export type JobApplicant = {
   application_id: string;
   artist_id: string;
@@ -61,9 +63,9 @@ export function formatJobLocation(job: Pick<JobRow, "city" | "state">): string {
   return [job.city, job.state].filter(Boolean).join(", ") || "Location not specified";
 }
 
-/** Open jobs any signed-in artist can browse and apply to. */
+/** Open jobs any signed-in artist can browse and apply to — includes the posting client's name. */
 export async function listOpenJobs() {
-  return supabase.from("jobs").select("*").eq("status", "open").order("created_at", { ascending: false });
+  return supabase.from("jobs_open").select("*").order("created_at", { ascending: false });
 }
 
 /** The current client's own jobs, open or closed. */

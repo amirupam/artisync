@@ -15,7 +15,7 @@ import EmptyState from "@/components/EmptyState";
 import SaveArtistButton from "@/components/SaveArtistButton";
 import { useChat } from "@/components/ChatContext";
 import NotificationBell from "@/components/NotificationBell";
-import DashboardLink from "@/components/DashboardLink";
+import ArtistNav from "@/components/ArtistNav";
 
 const PAGE_SIZE = 12;
 
@@ -111,6 +111,7 @@ export default function ArtistsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [isArtist, setIsArtist] = useState(false);
   const [preferences, setPreferences] = useState<ClientPreferences | null>(null);
   const [prefsChecked, setPrefsChecked] = useState(false);
   const [searchInput, setSearchInput] = useState("");
@@ -125,14 +126,19 @@ export default function ArtistsPage() {
       const uid = session?.user?.id ?? null;
       setClientId(uid);
       if (uid) {
-        const { data: clientRow } = await supabase.from("clients").select("id").eq("id", uid).maybeSingle();
+        const [{ data: clientRow }, { data: artistRow }] = await Promise.all([
+          supabase.from("clients").select("id").eq("id", uid).maybeSingle(),
+          supabase.from("artists").select("id").eq("id", uid).maybeSingle(),
+        ]);
         setIsClient(!!clientRow);
+        setIsArtist(!!artistRow);
         const { data } = await supabase.from("client_preferences").select("*").eq("client_id", uid).maybeSingle();
         const p = data ? mapClientPreferencesRow(data) : null;
         setPreferences(p);
         if (p?.latitude != null && p?.longitude != null) setRefPoint({ lat: p.latitude, lng: p.longitude });
       } else {
         setIsClient(false);
+        setIsArtist(false);
         setPreferences(null);
       }
       setPrefsChecked(true);
@@ -397,19 +403,22 @@ export default function ArtistsPage() {
             />
           </div>
           {clientId ? (
-            <>
-              <DashboardLink />
-              {isClient && (
-                <>
-                  <NotificationBell />
-                  <Link href="/my-jobs" className="hidden sm:inline-block flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">My Jobs</Link>
-                  <Link href="/post-job" className="flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">Post a Job</Link>
-                </>
-              )}
-              <button type="button" onClick={openPanel} className="flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">Messages</button>
-              <Link href="/saved-artists" className="hidden sm:inline-block flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">Saved</Link>
-              <button onClick={() => supabase.auth.signOut().then(() => router.replace("/"))} className="flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">Sign out</button>
-            </>
+            isArtist ? (
+              <ArtistNav active="discover" />
+            ) : (
+              <>
+                {isClient && (
+                  <>
+                    <NotificationBell />
+                    <Link href="/my-jobs" className="hidden sm:inline-block flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">My Jobs</Link>
+                    <Link href="/post-job" className="flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">Post a Job</Link>
+                  </>
+                )}
+                <button type="button" onClick={openPanel} className="flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">Messages</button>
+                <Link href="/saved-artists" className="hidden sm:inline-block flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">Saved</Link>
+                <button onClick={() => supabase.auth.signOut().then(() => router.replace("/"))} className="flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">Sign out</button>
+              </>
+            )
           ) : (
             <Link href={{ pathname: "/signup", query: { role: "client" } }} className="flex-shrink-0 text-xs font-semibold px-4 py-2 bg-[var(--color-primary)] text-white rounded-[var(--radius-md)] hover:bg-[var(--color-primary-hover)] whitespace-nowrap">
               Sign in
