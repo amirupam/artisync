@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import {
   looksLikeContactLeak,
   markConversationRead,
+  reopenConversation,
   type ConversationRow,
   type MessageRow,
   type ContactShareRequestRow,
@@ -149,6 +150,10 @@ export default function ChatThread({
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
+    await sendMessage();
+  }
+
+  async function sendMessage() {
     if (!conversation) return;
     if (!body.trim() && !file) return;
     if (file && file.size > 10 * 1024 * 1024) {
@@ -239,6 +244,20 @@ export default function ChatThread({
       .eq("id", conversation.id);
     if (error) showToast(error.message, "error");
     setMenuOpen(false);
+  }
+
+  async function handleReopen() {
+    if (!conversation) return;
+    const { data, error } = await reopenConversation(conversation.id);
+    if (error) { showToast(error.message, "error"); return; }
+    if (data) setConversation(data as ConversationRow);
+  }
+
+  function handleComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
   }
 
   if (loading) {
@@ -381,6 +400,7 @@ export default function ChatThread({
               <Textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
+                onKeyDown={handleComposerKeyDown}
                 rows={compact ? 1 : 2}
                 placeholder="Type a message…"
                 aria-label="Message"
@@ -413,10 +433,13 @@ export default function ChatThread({
             </label>
             <Button type="submit" variant="primary" size={compact ? "sm" : "md"} disabled={sending || (!body.trim() && !file)}>Send</Button>
           </form>
+        ) : isBlocked ? (
+          <p className="text-center text-xs text-[var(--color-text-secondary)] py-3 px-3">This conversation has been blocked.</p>
         ) : (
-          <p className="text-center text-xs text-[var(--color-text-secondary)] py-3 px-3">
-            {isBlocked ? "This conversation has been blocked." : "This conversation is closed."}
-          </p>
+          <div className="flex flex-col items-center gap-2 py-3 px-3">
+            <p className="text-xs text-[var(--color-text-secondary)]">This conversation is closed.</p>
+            <Button size="sm" variant="outline" onClick={handleReopen}>Reopen conversation</Button>
+          </div>
         )}
       </div>
 

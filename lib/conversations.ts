@@ -76,6 +76,11 @@ export async function listMyConversations() {
   return supabase.rpc("list_my_conversations");
 }
 
+/** Reopens a conversation either side previously closed (not blocked). */
+export async function reopenConversation(conversationId: string) {
+  return supabase.rpc("reopen_conversation", { p_conversation_id: conversationId }).single();
+}
+
 export async function markConversationRead(conversationId: string) {
   return supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
 }
