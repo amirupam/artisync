@@ -25,6 +25,7 @@ export type JobApplicant = {
   application_id: string;
   artist_id: string;
   artist_name: string;
+  artist_slug: string;
   artist_photo: string;
   artist_headline: string;
   message: string;
@@ -33,6 +34,17 @@ export type JobApplicant = {
   attachment_url: string | null;
   attachment_type: string | null;
   status: ApplicationStatus;
+  created_at: string;
+};
+
+export type PendingApplicationNotification = {
+  application_id: string;
+  job_id: string;
+  job_title: string;
+  artist_id: string;
+  artist_name: string;
+  artist_slug: string;
+  artist_photo: string;
   created_at: string;
 };
 
@@ -110,4 +122,9 @@ export async function listJobApplicants(jobId: string) {
 
 export async function respondToApplication(applicationId: string, status: "accepted" | "declined") {
   return supabase.from("job_applications").update({ status }).eq("id", applicationId);
+}
+
+/** Pending applications across every job the current client has posted — powers the notification bell. */
+export async function listMyPendingApplications() {
+  return supabase.rpc("list_my_pending_applications");
 }

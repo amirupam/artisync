@@ -14,6 +14,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import EmptyState from "@/components/EmptyState";
 import SaveArtistButton from "@/components/SaveArtistButton";
 import { useChat } from "@/components/ChatContext";
+import NotificationBell from "@/components/NotificationBell";
 
 const PAGE_SIZE = 12;
 
@@ -398,6 +399,7 @@ export default function ArtistsPage() {
             <>
               {isClient && (
                 <>
+                  <NotificationBell />
                   <Link href="/my-jobs" className="hidden sm:inline-block flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">My Jobs</Link>
                   <Link href="/post-job" className="flex-shrink-0 text-xs font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text)]">Post a Job</Link>
                 </>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { stripOAuthHashIfPresent } from "@/lib/stripOAuthHash";
 import { listMyJobs, listJobApplicants, closeJob, reopenJob, respondToApplication, getApplicationAttachmentUrl, formatBudget, formatJobLocation, type JobRow, type JobApplicant } from "@/lib/jobs";
@@ -13,6 +14,7 @@ import Badge from "@/components/Badge";
 import EmptyState from "@/components/EmptyState";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import NoIndexMeta from "@/components/NoIndexMeta";
+import NotificationBell from "@/components/NotificationBell";
 
 const STATUS_BADGE: Record<string, "neutral" | "accent" | "success" | "error"> = {
   pending: "accent",
@@ -40,10 +42,10 @@ function AttachmentPreview({ path, type }: { path: string; type: string | null }
   return <a href={url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs underline text-[var(--color-accent)]">Download attachment</a>;
 }
 
-function JobCard({ job, onChanged }: { job: JobRow; onChanged: () => void }) {
+function JobCard({ job, onChanged, autoExpand }: { job: JobRow; onChanged: () => void; autoExpand?: boolean }) {
   const { openConversationWithArtist } = useChat();
   const { showToast } = useToast();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(!!autoExpand);
   const [applicants, setApplicants] = useState<JobApplicant[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -115,15 +117,17 @@ function JobCard({ job, onChanged }: { job: JobRow; onChanged: () => void }) {
           ) : (
             applicants.map((a) => (
               <div key={a.application_id} className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
-                {a.artist_photo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.artist_photo} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-[var(--color-primary-soft)] flex-shrink-0" />
-                )}
+                <Link href={a.artist_slug ? `/artists/${a.artist_slug}` : "#"} className="flex-shrink-0">
+                  {a.artist_photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={a.artist_photo} alt="" className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-[var(--color-primary-soft)]" />
+                  )}
+                </Link>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-[var(--color-text)]">{a.artist_name}</p>
+                    <Link href={a.artist_slug ? `/artists/${a.artist_slug}` : "#"} className="text-sm font-semibold text-[var(--color-text)] hover:text-[var(--color-accent)] hover:underline">{a.artist_name}</Link>
                     <Badge variant={STATUS_BADGE[a.status] ?? "neutral"}>{a.status}</Badge>
                   </div>
                   {a.artist_headline && <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">{a.artist_headline}</p>}
@@ -207,7 +211,10 @@ export default function MyJobsPage() {
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <Container className="flex h-16 items-center justify-between">
           <Logo size="md" />
-          <Button href="/artists" variant="ghost" size="sm">Back to Artists</Button>
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            <Button href="/artists" variant="ghost" size="sm">Back to Artists</Button>
+          </div>
         </Container>
       </header>
 
@@ -230,7 +237,9 @@ export default function MyJobsPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {jobs.map((job) => <JobCard key={job.id} job={job} onChanged={() => loadJobs(userId)} />)}
+            {jobs.map((job) => (
+              <JobCard key={job.id} job={job} onChanged={() => loadJobs(userId)} autoExpand={router.query.job === job.id} />
+            ))}
           </div>
         )}
       </Container>
