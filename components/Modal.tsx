@@ -12,12 +12,18 @@ export default function Modal({
   children: ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
+  // Deliberately depends only on `open` — most callers pass an inline
+  // onClose (a new function every render), and re-running this on every
+  // keystroke elsewhere in the app would re-focus the panel and steal
+  // focus away from whatever input the user is actively typing in.
   useEffect(() => {
     if (!open) return;
     panelRef.current?.focus();
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     }
     document.addEventListener("keydown", onKeyDown);
     const prevOverflow = document.body.style.overflow;
@@ -26,7 +32,7 @@ export default function Modal({
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = prevOverflow;
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
