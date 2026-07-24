@@ -54,12 +54,6 @@ export default function PrivacyPage() {
           Last updated: {LAST_UPDATED} · Effective for all users of {SITE_URL.replace("https://", "")}
         </p>
 
-        <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-secondary)]">
-          This policy has been drafted to accurately describe how {SITE_NAME} actually handles data today.
-          It has not yet been reviewed by a lawyer, and should be treated as a working draft rather than a
-          finalized legal document until that review is complete.
-        </div>
-
         {/* Table of contents */}
         <nav aria-label="Table of contents" className="mt-8 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
           <p className="text-sm font-bold text-[var(--color-text)] mb-3">Contents</p>

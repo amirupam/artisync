@@ -4,11 +4,39 @@ import { supabase, mapArtistRow, type ArtistProfile } from "@/lib/supabaseClient
 import Logo from "@/components/Logo";
 import NoIndexMeta from "@/components/NoIndexMeta";
 import DashboardLink from "@/components/DashboardLink";
+import { isInstagramVideoUrl } from "@/lib/youtube";
 
 function getYouTubeId(url: string): string | null {
   if (!url) return null;
   const m = url.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : null;
+}
+
+// ── Instagram video links — shown as simple link-out cards, not embedded ──
+function InstagramVideoLinks({ urls, captions }: { urls: string[]; captions?: string[] }) {
+  const entries = urls
+    .map((u, i) => ({ url: u, caption: captions?.[i] ?? "" }))
+    .filter((e) => isInstagramVideoUrl(e.url));
+  if (!entries.length) return null;
+
+  return (
+    <div className="grid sm:grid-cols-2 gap-4">
+      {entries.map((e) => (
+        <a
+          key={e.url}
+          href={e.url}
+          target="_blank"
+          rel="noreferrer"
+          className="relative flex flex-col items-center justify-center gap-2 rounded-2xl overflow-hidden bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 text-white hover:opacity-90 transition-opacity"
+          style={{ aspectRatio: "16/9" }}
+        >
+          <svg className="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8.25a3.75 3.75 0 100 7.5 3.75 3.75 0 000-7.5zM16.5 3.75h-9a3.75 3.75 0 00-3.75 3.75v9a3.75 3.75 0 003.75 3.75h9a3.75 3.75 0 003.75-3.75v-9a3.75 3.75 0 00-3.75-3.75z" /></svg>
+          <span className="text-sm font-semibold">Watch on Instagram ↗</span>
+          {e.caption && <span className="text-xs text-white/80 px-3 text-center">{e.caption}</span>}
+        </a>
+      ))}
+    </div>
+  );
 }
 
 // ── Marquee photo strip (true circular queue — measures exact px width) ───
@@ -401,6 +429,9 @@ export default function ProfilePreviewPage() {
               <Label>Videos</Label>
             </div>
             <AutoVideoCarousel urls={videos} captions={profile.youtubeVideoCaptions} />
+            <div className="mt-4">
+              <InstagramVideoLinks urls={videos} captions={profile.youtubeVideoCaptions} />
+            </div>
           </div>
         )}
 

@@ -32,7 +32,9 @@ export default function TagInput({
     if (!v || values.includes(v)) return;
     onChange([...values, v]);
     setText("");
-    setOpen(false);
+    // Deliberately leave the suggestion list open — closing it after every
+    // pick meant selecting several suggestions in a row required
+    // re-focusing the input between each one.
   }
 
   function removeTag(v: string) {

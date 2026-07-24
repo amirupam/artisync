@@ -186,9 +186,9 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[var(--color-page)]">
       <NoIndexMeta />
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-        <Container className="flex h-16 items-center justify-between">
+        <Container className="flex flex-wrap gap-y-2 min-h-16 items-center justify-between py-2">
           <Logo size="md" />
-          <ArtistNav active="dashboard" />
+          <ArtistNav active="dashboard" className="flex-wrap" />
         </Container>
       </header>
 
@@ -226,7 +226,11 @@ export default function DashboardPage() {
 
               {openJobs.length === 0 ? (
                 <Card className="p-6">
-                  <EmptyState title="No open jobs right now" description="Check back soon — clients post new events regularly." />
+                  <EmptyState
+                    title="We're just getting started — bear with us!"
+                    description="We're actively bringing clients on board, and real opportunities will start showing up here soon. In the meantime, this is the perfect time to polish your profile and portfolio so you're ready to shine the moment a job lands."
+                    action={<Button href="/create-profile" variant="primary" size="sm">Polish your profile</Button>}
+                  />
                 </Card>
               ) : filteredJobs.length === 0 ? (
                 <Card className="p-6">

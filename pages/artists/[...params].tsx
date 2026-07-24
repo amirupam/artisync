@@ -20,7 +20,7 @@ import { useToast } from "@/components/Toast";
 import { generateArtistSummary } from "@/lib/artistSummary";
 import { buildArtistTitle, buildArtistDescription, buildListingTitle, buildListingDescription, LISTING_INDEX_THRESHOLD } from "@/lib/seoMeta";
 import { SITE_URL, SITE_NAME } from "@/lib/siteConfig";
-import { getYouTubeId } from "@/lib/youtube";
+import { getYouTubeId, isInstagramVideoUrl } from "@/lib/youtube";
 import { buildArtistJsonLd, serializeJsonLd } from "@/lib/structuredData";
 
 const LISTING_FETCH_LIMIT = 60;
@@ -57,16 +57,31 @@ function PhotoGallery({ urls, captions, artistName }: { urls: string[]; captions
 
 // ── Video list ───────────────────────────────────────────────────────────────
 function VideoList({ urls, captions }: { urls: string[]; captions?: string[] }) {
-  const entries = urls.map((u, i) => ({ url: u, caption: captions?.[i] ?? "", vid: getYouTubeId(u) })).filter((e) => e.vid);
+  const entries = urls
+    .map((u, i) => ({ url: u, caption: captions?.[i] ?? "", vid: getYouTubeId(u), instagram: isInstagramVideoUrl(u) }))
+    .filter((e) => e.vid || e.instagram);
   if (!entries.length) return null;
 
   return (
     <div className="grid sm:grid-cols-2 gap-5">
       {entries.map((e) => (
         <div key={e.url}>
-          <div className="relative rounded-[var(--radius-lg)] overflow-hidden bg-black" style={{ aspectRatio: "16/9" }}>
-            <iframe src={`https://www.youtube.com/embed/${e.vid}?rel=0`} title="Performance video" allowFullScreen className="w-full h-full border-0" loading="lazy" />
-          </div>
+          {e.vid ? (
+            <div className="relative rounded-[var(--radius-lg)] overflow-hidden bg-black" style={{ aspectRatio: "16/9" }}>
+              <iframe src={`https://www.youtube.com/embed/${e.vid}?rel=0`} title="Performance video" allowFullScreen className="w-full h-full border-0" loading="lazy" />
+            </div>
+          ) : (
+            <a
+              href={e.url}
+              target="_blank"
+              rel="noreferrer"
+              className="relative flex flex-col items-center justify-center gap-2 rounded-[var(--radius-lg)] overflow-hidden bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 text-white hover:opacity-90 transition-opacity"
+              style={{ aspectRatio: "16/9" }}
+            >
+              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8.25a3.75 3.75 0 100 7.5 3.75 3.75 0 000-7.5zM16.5 3.75h-9a3.75 3.75 0 00-3.75 3.75v9a3.75 3.75 0 003.75 3.75h9a3.75 3.75 0 003.75-3.75v-9a3.75 3.75 0 00-3.75-3.75z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.5 7.5h.008v.008H16.5V7.5z" /></svg>
+              <span className="text-sm font-semibold">Watch on Instagram ↗</span>
+            </a>
+          )}
           {e.caption && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{e.caption}</p>}
         </div>
       ))}

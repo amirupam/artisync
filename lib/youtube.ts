@@ -8,3 +8,8 @@ export function getYouTubeThumbnail(url: string): string | null {
   const id = getYouTubeId(url);
   return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
 }
+
+/** Instagram reels/posts/tv links — shown as a link-out card rather than embedded (no reliable iframe embed without their JS SDK). */
+export function isInstagramVideoUrl(url: string): boolean {
+  return /instagram\.com\/(reel|p|tv)\//i.test(url);
+}
